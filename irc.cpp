@@ -284,6 +284,7 @@ void ircClient::receive(std::string &text) {
     if (cmd == "JOIN") {
       msg_to.erase(0, 1); // channel
 
+      channels_lock.lock();
       if (nick == source) {
         // yes, we are joining
         std::string output =
@@ -299,11 +300,13 @@ void ircClient::receive(std::string &text) {
         message(output);
         channels[msg_to].insert(source);
       }
+      channels_lock.unlock();
     }
 
     if (cmd == "PART") {
       msg_to.erase(0, 1); // channel
 
+      channels_lock.lock();
       if (nick == source) {
         std::string output = "You left " + msg_to;
 
@@ -324,6 +327,45 @@ void ircClient::receive(std::string &text) {
         message(output);
         channels[msg_to].erase(source);
       }
+      channels_lock.unlock();
+    }
+
+    if (cmd == "KICK") {
+      std::string wholeft = split_limit(parts[3], 2)[0];
+      std::string output =
+          source + " has kicked " + wholeft + " from " + msg_to;
+
+      channels_lock.lock();
+      if (wholeft == nick) {
+        channels.erase(msg_to);
+        if (!channels.empty()) {
+          talkto = channels.begin()->first;
+          output += " [talkto = " + talkto + "]";
+        } else {
+          talkto = "";
+        }
+      } else {
+        channels[msg_to].erase(wholeft);
+      }
+      channels_lock.unlock();
+      message(output);
+    }
+
+    if (cmd == "QUIT") {
+      std::string output = "* " + source + " has quit ";
+      message(output);
+
+      channels_lock.lock();
+      if (source == nick) {
+        // We've quit?
+        channels.erase(channels.begin(), channels.end());
+      } else {
+        for (auto c : channels) {
+          c.second.erase(source);
+          // would it be possible that channel is empty now?
+        }
+      }
+      channels_lock.unlock();
     }
 
     if (cmd == "353") {
@@ -337,6 +379,7 @@ void ircClient::receive(std::string &text) {
         names_list[0].erase(0, 1);
       }
 
+      channels_lock.lock();
       if (channels.find(channel) == channels.end()) {
         // does not exist
         channels.insert({channel, std::set<std::string>{}});
@@ -346,6 +389,7 @@ void ircClient::receive(std::string &text) {
         remove_channel_modes(name);
         channels[channel].insert(name);
       }
+      channels_lock.unlock();
     }
 
     if (cmd == "PRIVMSG") {

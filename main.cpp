@@ -126,27 +126,16 @@ int main(int argc, char *argv[]) {
 
         std::string cmd = m[1];
 
-        /* this should be tracked by ircClient class
-        if (cmd == "353") {
-          // NAMES list for channel, parse them out and append to names.
-          std::vector<std::string> names_list = split_limit(m[3], 999);
-          names_list.erase(names_list.begin());
-          names_list.erase(names_list.begin());
-          for (auto &name : names_list) {
-            if (name[0] == ':')
-              name.erase(0, 1);
-            names.push_back(name);
-          }
-        }
-        */
         if (cmd == "366") {
           // end of names, output and clear
           std::string channel = split_limit(m[3], 2)[0];
 
+          irc.channels_lock.lock();
           door << "* users on " << channel << " : ";
           for (auto name : irc.channels[channel]) {
             door << name << " ";
           }
+          irc.channels_lock.unlock();
           door << door::nl;
           // names.clear();
         }
