@@ -19,6 +19,156 @@ bool file_exists(const std::string name) {
   return f.good();
 }
 
+const int ms_input_delay = 50;
+std::string input;
+std::string prompt; // mostly for length to erase/restore properly
+int max_input = 100;
+door::ANSIColor prompt_color{door::COLOR::YELLOW, door::COLOR::BLUE,
+                             door::ATTR::BOLD};
+door::ANSIColor input_color{door::COLOR::WHITE}; // , door::COLOR::BLUE};
+
+void erase(door::Door &d, int count) {
+  d << door::reset;
+  for (int x = 0; x < count; ++x) {
+    d << "\x08 \x08";
+  }
+}
+
+void clear_input(door::Door &d) {
+  if (prompt.empty())
+    return;
+  erase(d, input.size());
+  erase(d, prompt.size());
+}
+
+void restore_input(door::Door &d) {
+  if (prompt.empty())
+    return;
+  d << prompt_color << prompt << input_color << input;
+}
+
+/*
+commands:
+
+/h /help /?
+/t /talk /talkto [TARGET]
+/msg [TO] [message]
+/me [message]
+/quit [message, maybe]
+/join [TARGET]
+/part [TARGET]
+
+future:
+/list    ?
+/version ?
+*/
+
+bool check_for_input(door::Door &d, ircClient &irc) {
+  int c;
+
+  // return true when we have input and is "valid" // ready
+  if (prompt.empty()) {
+    // ok, nothing has been displayed at this time.
+    if (d.haskey()) {
+      // something to do.
+      prompt = "[" + irc.talkto + "] ";
+      d << prompt_color << prompt << input_color;
+      c = d.sleep_key(1);
+      if (c < 0) {
+        // handle timeout/hangup/out of time
+        return false;
+      }
+      if (c > 0x1000)
+        return false;
+      if (isprint(c)) {
+        d << (char)c;
+        input.append(1, c);
+      }
+    }
+    return false;
+  } else {
+    // continue on with what we have displayed.
+    c = d.sleep_ms_key(ms_input_delay);
+    if (c != -1) {
+      /*
+      c = d.sleep_key(1);
+      if (c < 0) {
+        // handle error
+        return false;
+      }
+      */
+      if (c > 0x1000)
+        return false;
+      if (isprint(c)) {
+        d << (char)c;
+        input.append(1, c);
+        // hot-keys
+        if (input[0] == '/') {
+          if (input.size() == 2) {
+            switch (input[1]) {
+            case 'j':
+            case 'J':
+              erase(d, input.size());
+              input = "/join ";
+              d << input;
+              break;
+            case 'p':
+            case 'P':
+              erase(d, input.size());
+              input = "/part ";
+              d << input;
+              break;
+            case 't':
+            case 'T':
+              erase(d, input.size());
+              input = "/talkto ";
+              d << input;
+              break;
+            case 'h':
+            case 'H':
+            case '?':
+              erase(d, input.size());
+              input = "/help";
+              d << input;
+              break;
+            }
+          }
+        }
+      }
+      if ((c == 0x08) or (c == 0x7f)) {
+        // hot-keys
+        if (input[0] == '/') {
+          if ((input == "/help") or (input == "/talkto ") or
+              (input == "/join ") or (input == "/part")) {
+            erase(d, input.size());
+            erase(d, prompt.size());
+            input.clear();
+            prompt.clear();
+            return false;
+          }
+        }
+        if (input.size() > 1) {
+          erase(d, 1);
+          d << input_color;
+          input.erase(input.length() - 1);
+        } else {
+          // erasing the last character
+          erase(d, 1);
+          input.clear();
+          erase(d, prompt.size());
+          prompt.clear();
+          return false;
+        }
+      }
+      if (c == 0x0d) {
+        prompt.clear();
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
 int main(int argc, char *argv[]) {
   using namespace std::chrono_literals;
 
@@ -85,6 +235,25 @@ int main(int argc, char *argv[]) {
   // main "loop" -- not the proper way to do it.
   bool in_door = true;
   while (in_door) {
+    // the main loop
+    // custom input routine goes here
+
+    if (check_for_input(door, irc)) {
+      // yes, we have something
+      if (input[0] == '/') {
+        // command given
+        if (std::toupper(input[1]) == 'Q') {
+          irc.write("QUIT");
+        }
+      } else {
+        std::string output = "PRIVMSG " + irc.talkto + " :" + input;
+        irc.write(output);
+      };
+      input.clear();
+      door << door::nl;
+    }
+
+    /*
     if (door.haskey()) {
       door << ">> ";
       std::string input = door.input_string(100);
@@ -107,15 +276,23 @@ int main(int argc, char *argv[]) {
         }
       }
     }
+    */
 
     boost::optional<std::vector<std::string>> msg;
 
     // hold list of users -- until end names received.
     // std::vector<std::string> names;
 
+    bool input_cleared = false;
+
     do {
       msg = irc.buffer_maybe_pop();
+
       if (msg) {
+        if (!input_cleared) {
+          input_cleared = true;
+          clear_input(door);
+        }
         std::vector<std::string> m = *msg;
 
         if (m.size() == 1) {
@@ -173,22 +350,35 @@ int main(int argc, char *argv[]) {
         }
 
         if (cmd == "PRIVMSG") {
+          door::ANSIColor nick_color{door::COLOR::WHITE, door::COLOR::BLUE};
+
           if (m[2][0] == '#') {
             std::string tmp = m[3];
             tmp.erase(0, 1);
-
-            door << parse_nick(m[0]) << "/" << m[2] << " " << tmp << door::nl;
+            door::ANSIColor channel_color{door::COLOR::WHITE,
+                                          door::COLOR::BLUE};
+            if (m[2] == irc.talkto) {
+              channel_color = door::ANSIColor{
+                  door::COLOR::YELLOW, door::COLOR::BLUE, door::ATTR::BOLD};
+            }
+            door << nick_color << parse_nick(m[0])
+                 << door::ANSIColor(door::COLOR::CYAN) << "/" << channel_color
+                 << m[2] << door::reset << " " << tmp << door::nl;
           } else {
             std::string tmp = m[3];
             tmp.erase(0, 1);
 
-            door << parse_nick(m[0]) << " " << tmp << door::nl;
+            door << nick_color << parse_nick(m[0]) << door::reset << " " << tmp
+                 << door::nl;
           }
         }
       }
     } while (msg);
 
-    std::this_thread::sleep_for(200ms);
+    if (input_cleared)
+      restore_input(door);
+
+    // std::this_thread::sleep_for(200ms);
     if (irc.shutdown)
       in_door = false;
   }
