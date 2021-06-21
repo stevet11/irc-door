@@ -321,6 +321,13 @@ int main(int argc, char *argv[]) {
           // names.clear();
         }
 
+        if (cmd == "372") {
+          // MOTD
+          std::string temp = m[3];
+          temp.erase(0,1);
+          door << "* " <<  temp << door::nl;
+        }
+
         // 400 and 500 are errors?  should show those.
         if ((cmd[0] == '4') or (cmd[0] == '5')) {
           std::string tmp = m[3];
