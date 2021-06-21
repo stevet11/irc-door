@@ -38,13 +38,13 @@ void clear_input(door::Door &d) {
   if (prompt.empty())
     return;
   erase(d, input.size());
-  erase(d, prompt.size());
+  erase(d, prompt.size() + 1);
 }
 
 void restore_input(door::Door &d) {
   if (prompt.empty())
     return;
-  d << prompt_color << prompt << input_color << input;
+  d << prompt_color << prompt << input_color << " " << input;
 }
 
 /*
@@ -71,8 +71,8 @@ bool check_for_input(door::Door &d, ircClient &irc) {
     // ok, nothing has been displayed at this time.
     if (d.haskey()) {
       // something to do.
-      prompt = "[" + irc.talkto + "] ";
-      d << prompt_color << prompt << input_color;
+      prompt = "[" + irc.talkto + "]";
+      d << prompt_color << prompt << input_color << " ";
       c = d.sleep_key(1);
       if (c < 0) {
         // handle timeout/hangup/out of time
@@ -155,7 +155,7 @@ bool check_for_input(door::Door &d, ircClient &irc) {
           // erasing the last character
           erase(d, 1);
           input.clear();
-          erase(d, prompt.size());
+          erase(d, prompt.size() + 1);
           prompt.clear();
           return false;
         }
@@ -244,6 +244,10 @@ int main(int argc, char *argv[]) {
         // command given
         if (std::toupper(input[1]) == 'Q') {
           irc.write("QUIT");
+        } else {
+          // for now, just output whatever they gave us.
+          input.erase(0,1);
+          irc.write(input);
         }
       } else {
         std::string output = "PRIVMSG " + irc.talkto + " :" + input;

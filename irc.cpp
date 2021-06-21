@@ -172,6 +172,11 @@ void ircClient::on_resolve(
   if (logging) {
     log() << "Resolve: " << error.message() << std::endl;
   }
+  if (error) {
+    std::string output = "Unable to resolve (DNS Issue?): " + error.message();
+    message(output);
+    socket.async_shutdown(std::bind(&ircClient::on_shutdown, this, _1));
+  }
   boost::asio::async_connect(socket.next_layer(), results,
                              std::bind(&ircClient::on_connect, this, _1, _2));
 }
@@ -182,6 +187,12 @@ void ircClient::on_connect(error_code error,
     log() << "Connect: " << error.message() << ", endpoint: " << endpoint
           << std::endl;
   }
+  if (error) {
+    std::string output = "Unable to connect: " + error.message();
+    message(output);
+    socket.async_shutdown(std::bind(&ircClient::on_shutdown, this, _1));
+  }
+
   socket.async_handshake(boost::asio::ssl::stream_base::client,
                          std::bind(&ircClient::on_handshake, this, _1));
 }
@@ -190,6 +201,12 @@ void ircClient::on_handshake(error_code error) {
   if (logging) {
     log() << "Handshake: " << error.message() << std::endl;
   }
+  if (error) {
+    std::string output = "Handshake: " + error.message();
+    message(output);
+    socket.async_shutdown(std::bind(&ircClient::on_shutdown, this, _1));
+  }
+
   std::string request = registration();
   boost::asio::async_write(socket, boost::asio::buffer(request),
                            std::bind(&ircClient::on_write, this, _1, _2));
