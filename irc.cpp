@@ -496,26 +496,6 @@ void ircClient::receive(std::string &text) {
     }
   }
 
-  /*
-    if (parts[1] == "JOIN") {
-      // Are we joining?
-      std::string guest = parse_nick(parts[0]);
-      if (guest == nick) {
-        // yes, it is us!
-        std::string temp = parts[2];
-        temp.erase(0, 1);
-        talkto = temp;
-        std::string msg = "You have joined " + temp;
-        message(msg);
-      } else {
-        std::string temp = parts[2];
-        temp.erase(0, 1);
-        std::string msg = parse_nick(parts[0]) + " has joined " + temp;
-        message(msg);
-      }
-    }
-  */
-
   // CTCP handler
   // NOTE:  When sent to a channel, the response is sent to the sender.
 
@@ -538,15 +518,6 @@ void ircClient::receive(std::string &text) {
         return;
       }
     }
-
-    /*
-        if (parts[1] == "372") {
-          // MOTD
-          std::string msg = parts[3];
-          msg.erase(0, 1);
-          motd.push_back(msg);
-        }
-    */
 
     if ((parts[1] == "376") or (parts[1] == "422")) {
       // END MOTD, or MOTD MISSING

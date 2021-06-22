@@ -56,6 +56,6 @@ endif()
 
 add_subdirectory(yaml-cpp)
 
-add_executable(irc-door main.cpp irc.h irc.cpp)
+add_executable(irc-door main.cpp irc.h irc.cpp render.h render.cpp input.h input.cpp)
 target_link_libraries(irc-door door++ pthread ${LINK_LIBS} dl yaml-cpp)
 
