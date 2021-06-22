@@ -48,7 +48,22 @@ public:
   std::string debug_output;
   std::ofstream debug_file;
 
-  std::string talkto;
+protected:
+  boost::signals2::mutex talkto_lock;
+  std::string _talkto;
+
+public:
+  std::string talkto(void) {
+    talkto_lock.lock();
+    std::string ret{_talkto};
+    talkto_lock.unlock();
+    return ret;
+  };
+  void talkto(std::string talkvalue) {
+    talkto_lock.lock();
+    _talkto = talkvalue;
+    talkto_lock.unlock();
+  };
 
   // channels / users
   boost::signals2::mutex channels_lock;

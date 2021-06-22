@@ -71,7 +71,7 @@ bool check_for_input(door::Door &d, ircClient &irc) {
     // ok, nothing has been displayed at this time.
     if (d.haskey()) {
       // something to do.
-      prompt = "[" + irc.talkto + "]";
+      prompt = "[" + irc.talkto() + "]";
       d << prompt_color << prompt << input_color << " ";
       c = d.sleep_key(1);
       if (c < 0) {
@@ -131,6 +131,11 @@ bool check_for_input(door::Door &d, ircClient &irc) {
               input = "/help";
               d << input;
               break;
+            case 'q':
+            case 'Q':
+              erase(d, input.size());
+              input = "/quit";
+              d << input;
             }
           }
         }
@@ -139,7 +144,7 @@ bool check_for_input(door::Door &d, ircClient &irc) {
         // hot-keys
         if (input[0] == '/') {
           if ((input == "/help") or (input == "/talkto ") or
-              (input == "/join ") or (input == "/part")) {
+              (input == "/join ") or (input == "/part") or (input == "/quit")) {
             erase(d, input.size());
             erase(d, prompt.size());
             input.clear();
@@ -161,6 +166,7 @@ bool check_for_input(door::Door &d, ircClient &irc) {
         }
       }
       if (c == 0x0d) {
+        clear_input(d);
         prompt.clear();
         return true;
       }
@@ -242,19 +248,76 @@ int main(int argc, char *argv[]) {
       // yes, we have something
       if (input[0] == '/') {
         // command given
+        std::vector<std::string> cmd = split_limit(input, 3);
+
+        if (cmd[0] == "/quit") {
+          irc.write("QUIT");
+        }
+        if (cmd[0] == "/talkto") {
+          irc.talkto(cmd[1]);
+          door << "[talkto = " << cmd[1] << "]" << door::nl;
+        }
+
+        if (cmd[0] == "/join") {
+          std::string tmp = "JOIN " + cmd[1];
+          irc.write(tmp);
+        }
+
+        if (cmd[0] == "/part") {
+          std::string tmp = "PART " + cmd[1];
+          irc.write(tmp);
+        }
+
+        if (cmd[0] == "/me") {
+          cmd = split_limit(input, 2);
+          std::string tmp = "PRIVMSG " + irc.talkto() + " :\x01" + "ACTION " +
+                            cmd[1] + "\x01";
+          irc.write(tmp);
+          door << "* " << irc.nick << " " << cmd[1] << door::nl;
+        }
+
+        if (cmd[0] == "/info") {
+          irc.channels_lock.lock();
+          for (auto c : irc.channels) {
+            door << "CH " << c.first << " ";
+            for (auto s : c.second) {
+              door << s << " ";
+            }
+            door << door::nl;
+          }
+          irc.channels_lock.unlock();
+        }
+        /*
         if (std::toupper(input[1]) == 'Q') {
           irc.write("QUIT");
         } else {
           // for now, just output whatever they gave us.
-          input.erase(0,1);
+          input.erase(0, 1);
           irc.write(input);
         }
+        */
       } else {
-        std::string output = "PRIVMSG " + irc.talkto + " :" + input;
+        std::string target = irc.talkto();
+        std::string output = "PRIVMSG " + target + " :" + input;
+        // I need to display something here to show we've said something (and
+        // where we've said it)
+        door::ANSIColor nick_color{door::COLOR::WHITE, door::COLOR::BLUE};
+
+        if (target[0] == '#') {
+          door::ANSIColor channel_color = door::ANSIColor{
+              door::COLOR::YELLOW, door::COLOR::BLUE, door::ATTR::BOLD};
+
+          door << nick_color << irc.nick << door::ANSIColor(door::COLOR::CYAN)
+               << "/" << channel_color << target << door::reset << " " << input
+               << door::nl;
+
+        } else {
+          door << nick_color << irc.nick << "/" << target << door::reset << " "
+               << input << door::nl;
+        }
         irc.write(output);
       };
       input.clear();
-      door << door::nl;
     }
 
     /*
@@ -324,8 +387,8 @@ int main(int argc, char *argv[]) {
         if (cmd == "372") {
           // MOTD
           std::string temp = m[3];
-          temp.erase(0,1);
-          door << "* " <<  temp << door::nl;
+          temp.erase(0, 1);
+          door << "* " << temp << door::nl;
         }
 
         // 400 and 500 are errors?  should show those.
@@ -368,7 +431,7 @@ int main(int argc, char *argv[]) {
             tmp.erase(0, 1);
             door::ANSIColor channel_color{door::COLOR::WHITE,
                                           door::COLOR::BLUE};
-            if (m[2] == irc.talkto) {
+            if (m[2] == irc.talkto()) {
               channel_color = door::ANSIColor{
                   door::COLOR::YELLOW, door::COLOR::BLUE, door::ATTR::BOLD};
             }

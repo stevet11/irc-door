@@ -307,7 +307,7 @@ void ircClient::receive(std::string &text) {
         std::string output =
             "You have joined " + msg_to + " [talkto = " + msg_to + "]";
         message(output);
-        talkto = msg_to;
+        talkto(msg_to);
         // insert empty set here.
         std::set<std::string> empty;
         channels[msg_to] = empty;
@@ -321,18 +321,46 @@ void ircClient::receive(std::string &text) {
     }
 
     if (cmd == "PART") {
-      msg_to.erase(0, 1); // channel
-
       channels_lock.lock();
       if (nick == source) {
         std::string output = "You left " + msg_to;
 
-        channels.erase(msg_to);
+        if (logging) {
+          for (auto c : channels) {
+            log() << c.first << " ";
+            for (auto s : c.second) {
+              log() << s << " ";
+            }
+            log() << std::endl;
+          }
+        }
+
+        {
+          auto ch = channels.find(msg_to);
+          if (ch != channels.end()) {
+            channels.erase(ch);
+            log() << "erase ! " << msg_to << std::endl;
+
+          } else {
+            log() << "failed to find " << msg_to << std::endl;
+          }
+        }
+
+        if (logging) {
+          for (auto c : channels) {
+            log() << c.first << " ";
+            for (auto s : c.second) {
+              log() << s << " ";
+            }
+            log() << std::endl;
+          }
+        }
+
         if (!channels.empty()) {
-          talkto = channels.begin()->first;
-          output += " [talkto = " + talkto + "]";
+          talkto(channels.begin()->first);
+          output += " [talkto = " + talkto() + "]";
         } else {
-          talkto = "";
+          talkto("");
         }
         message(output);
 
@@ -356,10 +384,10 @@ void ircClient::receive(std::string &text) {
       if (wholeft == nick) {
         channels.erase(msg_to);
         if (!channels.empty()) {
-          talkto = channels.begin()->first;
-          output += " [talkto = " + talkto + "]";
+          talkto(channels.begin()->first);
+          output += " [talkto = " + talkto() + "]";
         } else {
-          talkto = "";
+          talkto("");
         }
       } else {
         channels[msg_to].erase(wholeft);
