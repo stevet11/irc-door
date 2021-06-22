@@ -446,6 +446,18 @@ void ircClient::receive(std::string &text) {
         message.erase(0, 2);
         message.erase(message.size() - 1);
 
+        std::vector<std::string> ctcp_cmd = split_limit(message, 2);
+
+        if (ctcp_cmd[0] != "ACTION") {
+          std::string msg =
+              "Received CTCP " + ctcp_cmd[0] + " from " + parse_nick(parts[0]);
+          this->message(msg);
+          if (logging) {
+            log() << "CTCP : [" << message << "] from " + parse_nick(parts[0])
+                  << std::endl;
+          }
+        }
+
         if (message == "VERSION") {
           std::string reply_to = parse_nick(parts[0]);
           boost::format fmt =
@@ -482,14 +494,7 @@ void ircClient::receive(std::string &text) {
           message.erase(0, 7);
           parts[1] = "ACTION"; // change PRIVMSG to ACTION
           parts[3] = message;
-        } else {
-          // Removed the : and leading/trailing \x01
-          std::string msg = "CTCP " + message + " from " + parse_nick(parts[0]);
-          this->message(msg);
-          if (logging) {
-            log() << "CTCP : [" << message << "]" << std::endl;
-          }
-        };
+        }
 
         // I have this parsed this far, now what can I do with it?!
       }
