@@ -98,21 +98,15 @@ int main(int argc, char *argv[]) {
 
   door << "Welcome to the IRC chat door." << door::nl;
 
-  // main "loop" -- not the proper way to do it.
   bool in_door = true;
 
   while (in_door) {
     // the main loop
     // custom input routine goes here
 
-    if (check_for_input(door, irc)) {
-    }
+    check_for_input(door, irc);
 
     boost::optional<message_stamp> msg;
-
-    // hold list of users -- until end names received.
-    // std::vector<std::string> names;
-
     bool input_cleared = false;
 
     do {
@@ -131,18 +125,25 @@ int main(int argc, char *argv[]) {
     if (input_cleared)
       restore_input(door);
 
+    // sleep is done in the check_for_input
     // std::this_thread::sleep_for(200ms);
     if (irc.shutdown)
       in_door = false;
   }
 
-  // We miss the ERROR / connection closed message
+  // Store error messages into door log!
+  while (!irc.errors.empty()) {
+    door.log() << "ERROR: " << irc.errors.front() << std::endl;
+    irc.errors.erase(irc.errors.begin());
+  }
 
   io_context.stop();
   Thread.join();
 
+  // disable the global logging std::function
+  get_logger = nullptr;
+
   door << "Returning to the BBS..." << door::nl;
 
-  // std::this_thread::sleep_for(2s);
   return 0;
 }

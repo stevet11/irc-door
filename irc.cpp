@@ -134,12 +134,22 @@ void ircClient::write(std::string output) {
   }
 }
 
+/**
+ * @brief thread safe messages.push_back
+ *
+ * @param msg
+ */
 void ircClient::message_append(message_stamp &msg) {
   lock.lock();
   messages.push_back(msg);
   lock.unlock();
 }
 
+/**
+ * @brief thread safe message_stamp pop
+ *
+ * @return boost::optional<message_stamp>
+ */
 boost::optional<message_stamp> ircClient::message_pop(void) {
   lock.lock();
   message_stamp msg;
@@ -153,41 +163,6 @@ boost::optional<message_stamp> ircClient::message_pop(void) {
   return msg;
 }
 
-/*
-void ircClient::buffer_append(std::vector<std::string> &data) {
-  lock.lock();
-  buffer.push_back(data);
-  lock.unlock();
-}
-
-int ircClient::buffer_size(void) {
-  lock.lock();
-  int size = buffer.size();
-  lock.unlock();
-  return size;
-}
-
-std::vector<std::string> ircClient::buffer_pop(void) {
-  lock.lock();
-  std::vector<std::string> ret = buffer.front();
-  buffer.erase(buffer.begin());
-  lock.unlock();
-  return ret;
-}
-
-boost::optional<std::vector<std::string>> ircClient::buffer_maybe_pop(void) {
-  lock.lock();
-  if (buffer.empty()) {
-    lock.unlock();
-    return boost::optional<std::vector<std::string>>{};
-  }
-  std::vector<std::string> ret = buffer.front();
-  buffer.erase(buffer.begin());
-  lock.unlock();
-  return ret;
-}
-*/
-
 void ircClient::on_resolve(
     error_code error, boost::asio::ip::tcp::resolver::results_type results) {
   if (logging) {
@@ -195,6 +170,7 @@ void ircClient::on_resolve(
   }
   if (error) {
     std::string output = "Unable to resolve (DNS Issue?): " + error.message();
+    errors.push_back(output);
     message(output);
     socket.async_shutdown(std::bind(&ircClient::on_shutdown, this, _1));
   }
@@ -211,6 +187,7 @@ void ircClient::on_connect(error_code error,
   if (error) {
     std::string output = "Unable to connect: " + error.message();
     message(output);
+    errors.push_back(output);
     socket.async_shutdown(std::bind(&ircClient::on_shutdown, this, _1));
   }
 
@@ -223,8 +200,9 @@ void ircClient::on_handshake(error_code error) {
     log() << "Handshake: " << error.message() << std::endl;
   }
   if (error) {
-    std::string output = "Handshake: " + error.message();
+    std::string output = "Handshake Failure: " + error.message();
     message(output);
+    errors.push_back(output);
     socket.async_shutdown(std::bind(&ircClient::on_shutdown, this, _1));
   }
 
@@ -279,6 +257,11 @@ void ircClient::read_until(error_code error, std::size_t bytes) {
       socket, response, '\n', std::bind(&ircClient::read_until, this, _1, _2));
 }
 
+/**
+ * @brief Append a system message to the messages.
+ *
+ * @param msg
+ */
 void ircClient::message(std::string msg) {
   message_stamp ms;
   ms.buffer.push_back(msg);
@@ -348,36 +331,9 @@ void ircClient::receive(std::string &text) {
       if (nick == source) {
         std::string output = "You left " + msg_to;
 
-        if (logging) {
-          for (auto c : channels) {
-            log() << c.first << " ";
-            for (auto s : c.second) {
-              log() << s << " ";
-            }
-            log() << std::endl;
-          }
-        }
-
-        {
-          auto ch = channels.find(msg_to);
-          if (ch != channels.end()) {
-            channels.erase(ch);
-            log() << "erase ! " << msg_to << std::endl;
-
-          } else {
-            log() << "failed to find " << msg_to << std::endl;
-          }
-        }
-
-        if (logging) {
-          for (auto c : channels) {
-            log() << c.first << " ";
-            for (auto s : c.second) {
-              log() << s << " ";
-            }
-            log() << std::endl;
-          }
-        }
+        auto ch = channels.find(msg_to);
+        if (ch != channels.end())
+          channels.erase(ch);
 
         if (!channels.empty()) {
           talkto(channels.begin()->first);
@@ -428,9 +384,10 @@ void ircClient::receive(std::string &text) {
         // We've quit?
         channels.erase(channels.begin(), channels.end());
       } else {
-        for (auto c : channels) {
+        for (auto &c : channels) {
           c.second.erase(source);
           // would it be possible that channel is empty now?
+          // no, because we're still in it.
         }
       }
       channels_lock.unlock();
@@ -457,6 +414,19 @@ void ircClient::receive(std::string &text) {
         remove_channel_modes(name);
         channels[channel].insert(name);
       }
+      channels_lock.unlock();
+    }
+
+    if (cmd == "NICK") {
+      msg_to.erase(0, 1);
+
+      channels_lock.lock();
+      for (auto &ch : channels) {
+        if (ch.second.erase(source) == 1) {
+          ch.second.insert(msg_to);
+        }
+      }
+
       channels_lock.unlock();
     }
 

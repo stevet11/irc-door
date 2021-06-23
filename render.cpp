@@ -27,6 +27,16 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
     door << "* ERROR: " << tmp << door::nl;
   }
 
+  if (cmd == "332") {
+    // joined channel with topic
+    std::vector<std::string> channel_topic = split_limit(irc_msg[3], 2);
+    channel_topic[1].erase(0, 1);
+    std::string output =
+        "Topic for " + channel_topic[0] + " is: " + channel_topic[1];
+    stamp(msg_stamp, door);
+    door << output << door::nl;
+  }
+
   if (cmd == "366") {
     // end of names, output and clear
     std::string channel = split_limit(irc_msg[3], 2)[0];
@@ -106,5 +116,12 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
       door << nick_color << parse_nick(irc_msg[0]) << door::reset << " " << tmp
            << door::nl;
     }
+  }
+
+  if (cmd == "NICK") {
+    std::string tmp = irc_msg[2];
+    tmp.erase(0, 1);
+    door << "* " << parse_nick(irc_msg[0]) << " is now known as " << tmp
+         << door::nl;
   }
 }

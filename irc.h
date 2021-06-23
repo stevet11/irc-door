@@ -78,19 +78,6 @@ public:
   boost::signals2::mutex channels_lock;
   std::map<std::string, std::set<std::string>> channels;
 
-  /*
-    std::set<std::string> channels;
-    std::set<std::string> users;
-      std::vector<std::string> motd;
-  */
-
-  // thread-safe buffer access
-  /*
-  void buffer_append(std::vector<std::string> &data);
-  int buffer_size(void);
-  std::vector<std::string> buffer_pop(void);
-  boost::optional<std::vector<std::string>> buffer_maybe_pop(void);
-  */
   void message(std::string msg);
   std::atomic<bool> shutdown;
 
@@ -98,9 +85,10 @@ public:
   void message_append(message_stamp &msg);
   boost::optional<message_stamp> message_pop(void);
 
+  std::vector<std::string> errors;
+
 private:
   boost::signals2::mutex lock;
-  // std::vector<std::vector<std::string>> buffer;
   std::vector<message_stamp> messages;
 
   bool registered;
