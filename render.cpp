@@ -1,11 +1,18 @@
 #include "render.h"
 
-void render(std::vector<std::string> irc_msg, door::Door &door,
-            ircClient &irc) {
+#include <iomanip>
+
+void stamp(message_stamp &msg_stamp, door::Door &door) {
+  door << std::put_time(std::localtime(&msg_stamp.stamp), "%T ");
+}
+
+void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
   // std::vector<std::string> irc_msg = *msg;
+  std::vector<std::string> &irc_msg = msg_stamp.buffer;
 
   if (irc_msg.size() == 1) {
     // system message
+    stamp(msg_stamp, door);
     door << "(" << irc_msg[0] << ")" << door::nl;
     return;
   }
@@ -16,6 +23,7 @@ void render(std::vector<std::string> irc_msg, door::Door &door,
     std::string tmp = irc_msg[1];
     if (tmp[0] == ':')
       tmp.erase(0, 1);
+    stamp(msg_stamp, door);
     door << "* ERROR: " << tmp << door::nl;
   }
 
@@ -24,6 +32,7 @@ void render(std::vector<std::string> irc_msg, door::Door &door,
     std::string channel = split_limit(irc_msg[3], 2)[0];
 
     irc.channels_lock.lock();
+    stamp(msg_stamp, door);
     door << "* users on " << channel << " : ";
     for (auto name : irc.channels[channel]) {
       door << name << " ";
@@ -37,6 +46,7 @@ void render(std::vector<std::string> irc_msg, door::Door &door,
     // MOTD
     std::string temp = irc_msg[3];
     temp.erase(0, 1);
+    stamp(msg_stamp, door);
     door << "* " << temp << door::nl;
   }
 
@@ -45,22 +55,24 @@ void render(std::vector<std::string> irc_msg, door::Door &door,
     std::string tmp = irc_msg[3];
     if (tmp[0] == ':')
       tmp.erase(0, 1);
-
+    stamp(msg_stamp, door);
     door << "* " << tmp << door::nl;
   }
 
   if (cmd == "NOTICE") {
     std::string tmp = irc_msg[3];
     tmp.erase(0, 1);
-
+    stamp(msg_stamp, door);
     door << parse_nick(irc_msg[0]) << " NOTICE " << tmp << door::nl;
   }
 
   if (cmd == "ACTION") {
     if (irc_msg[2][0] == '#') {
-      door << "* " << parse_nick(irc_msg[0]) << "/" << irc_msg[2] << " "
+      stamp(msg_stamp, door);
+      door << "* " << irc_msg[2] << "/" << parse_nick(irc_msg[0]) << " "
            << irc_msg[3] << door::nl;
     } else {
+      stamp(msg_stamp, door);
       door << "* " << parse_nick(irc_msg[0]) << " " << irc_msg[3] << door::nl;
     }
   }
@@ -68,7 +80,7 @@ void render(std::vector<std::string> irc_msg, door::Door &door,
   if (cmd == "TOPIC") {
     std::string tmp = irc_msg[3];
     tmp.erase(0, 1);
-
+    stamp(msg_stamp, door);
     door << parse_nick(irc_msg[0]) << " set topic of " << irc_msg[2] << " to "
          << tmp << door::nl;
   }
@@ -84,13 +96,13 @@ void render(std::vector<std::string> irc_msg, door::Door &door,
         channel_color = door::ANSIColor{door::COLOR::YELLOW, door::COLOR::BLUE,
                                         door::ATTR::BOLD};
       }
-      door << nick_color << parse_nick(irc_msg[0])
-           << door::ANSIColor(door::COLOR::CYAN) << "/" << channel_color
-           << irc_msg[2] << door::reset << " " << tmp << door::nl;
+      stamp(msg_stamp, door);
+      door << channel_color << irc_msg[2] << "/" << nick_color
+           << parse_nick(irc_msg[0]) << door::reset << " " << tmp << door::nl;
     } else {
       std::string tmp = irc_msg[3];
       tmp.erase(0, 1);
-
+      stamp(msg_stamp, door);
       door << nick_color << parse_nick(irc_msg[0]) << door::reset << " " << tmp
            << door::nl;
     }

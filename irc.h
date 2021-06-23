@@ -12,6 +12,7 @@
 #include <string>
 // #include <vector>
 #include <algorithm>
+#include <ctime> // time_t
 #include <fstream>
 #include <set>
 
@@ -21,6 +22,13 @@ std::vector<std::string> split_limit(std::string &text, int max = -1);
 std::vector<std::string> irc_split(std::string &text);
 std::string parse_nick(std::string &name);
 void remove_channel_modes(std::string &nick);
+
+class message_stamp {
+public:
+  message_stamp() { time(&stamp); }
+  std::time_t stamp;
+  std::vector<std::string> buffer;
+};
 
 // using error_code = boost::system::error_code;
 
@@ -59,6 +67,7 @@ public:
     talkto_lock.unlock();
     return ret;
   };
+
   void talkto(std::string talkvalue) {
     talkto_lock.lock();
     _talkto = talkvalue;
@@ -76,16 +85,23 @@ public:
   */
 
   // thread-safe buffer access
+  /*
   void buffer_append(std::vector<std::string> &data);
   int buffer_size(void);
   std::vector<std::string> buffer_pop(void);
   boost::optional<std::vector<std::string>> buffer_maybe_pop(void);
+  */
   void message(std::string msg);
   std::atomic<bool> shutdown;
+
+  // thread-safe messages access
+  void message_append(message_stamp &msg);
+  boost::optional<message_stamp> message_pop(void);
 
 private:
   boost::signals2::mutex lock;
   std::vector<std::vector<std::string>> buffer;
+  std::vector<message_stamp> messages;
 
   bool registered;
   std::string original_nick;

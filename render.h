@@ -6,6 +6,6 @@
 #include <string>
 #include <vector>
 
-void render(std::vector<std::string> irc_msg, door::Door &door, ircClient &irc);
+void render(message_stamp &irc_msg, door::Door &door, ircClient &irc);
 
 #endif

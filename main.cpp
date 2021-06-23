@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
     if (check_for_input(door, irc)) {
     }
 
-    boost::optional<std::vector<std::string>> msg;
+    boost::optional<message_stamp> msg;
 
     // hold list of users -- until end names received.
     // std::vector<std::string> names;
@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
     bool input_cleared = false;
 
     do {
-      msg = irc.buffer_maybe_pop();
+      msg = irc.message_pop();
 
       if (msg) {
         if (!input_cleared) {

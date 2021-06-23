@@ -134,6 +134,26 @@ void ircClient::write(std::string output) {
   }
 }
 
+void ircClient::message_append(message_stamp &msg) {
+  lock.lock();
+  messages.push_back(msg);
+  lock.unlock();
+}
+
+boost::optional<message_stamp> ircClient::message_pop(void) {
+  lock.lock();
+  message_stamp msg;
+  if (messages.empty()) {
+    lock.unlock();
+    return boost::optional<message_stamp>{};
+  }
+  msg = messages.front();
+  messages.erase(messages.begin());
+  lock.unlock();
+  return msg;
+}
+
+/*
 void ircClient::buffer_append(std::vector<std::string> &data) {
   lock.lock();
   buffer.push_back(data);
@@ -166,6 +186,7 @@ boost::optional<std::vector<std::string>> ircClient::buffer_maybe_pop(void) {
   lock.unlock();
   return ret;
 }
+*/
 
 void ircClient::on_resolve(
     error_code error, boost::asio::ip::tcp::resolver::results_type results) {
@@ -259,13 +280,15 @@ void ircClient::read_until(error_code error, std::size_t bytes) {
 }
 
 void ircClient::message(std::string msg) {
-  std::vector<std::string> vs;
-  vs.push_back(msg);
-  buffer_append(vs);
+  message_stamp ms;
+  ms.buffer.push_back(msg);
+  message_append(ms);
 }
 
 void ircClient::receive(std::string &text) {
-  std::vector<std::string> parts = irc_split(text);
+  message_stamp ms;
+  ms.buffer = irc_split(text);
+  std::vector<std::string> &parts = ms.buffer; // irc_split(text);
 
   if (logging) {
     // this also shows our parser working
@@ -539,7 +562,7 @@ void ircClient::receive(std::string &text) {
     // std::cout << "BANG!" << std::endl;
   }
 
-  buffer_append(parts);
+  message_append(ms);
 
   // :FROM command TO :rest and ':' is optional
 
