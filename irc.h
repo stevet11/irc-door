@@ -100,7 +100,7 @@ public:
 
 private:
   boost::signals2::mutex lock;
-  std::vector<std::vector<std::string>> buffer;
+  // std::vector<std::vector<std::string>> buffer;
   std::vector<message_stamp> messages;
 
   bool registered;
