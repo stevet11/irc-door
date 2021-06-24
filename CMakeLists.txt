@@ -3,6 +3,8 @@ project(ircdoor
   VERSION 0.1
   LANGUAGES CXX C)
 
+cmake_policy(SET CMP0057 NEW)
+
 ###########
 # Debug or Release
 ###########
