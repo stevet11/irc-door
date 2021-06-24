@@ -16,6 +16,8 @@
 #include <fstream>
 #include <set>
 
+#include <boost/asio/io_context.hpp>
+
 void string_toupper(std::string &str);
 
 std::vector<std::string> split_limit(std::string &text, int max = -1);

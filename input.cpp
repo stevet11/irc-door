@@ -1,9 +1,10 @@
 #include "input.h"
+#include "render.h"
 
 bool allow_part = false;
 bool allow_join = false;
 
-const int ms_input_delay = 50;
+int ms_input_delay = 250;
 std::string input;
 std::string prompt; // mostly for length to erase/restore properly
 int max_input = 100;
@@ -49,13 +50,21 @@ future:
 
 void parse_input(door::Door &door, ircClient &irc) {
   // yes, we have something
+  std::time_t now_t;
+  time(&now_t);
+
   if (input[0] == '/') {
     // command given
     std::vector<std::string> cmd = split_limit(input, 3);
 
+    if (cmd[0] == "/motd") {
+      irc.write("MOTD");
+    }
+
     if (cmd[0] == "/quit") {
       irc.write("QUIT");
     }
+
     if (cmd[0] == "/talkto") {
       irc.talkto(cmd[1]);
       door << "[talkto = " << cmd[1] << "]" << door::nl;
@@ -75,12 +84,35 @@ void parse_input(door::Door &door, ircClient &irc) {
       }
     }
 
+    if (cmd[0] == "/msg") {
+      std::string tmp = "PRIVMSG " + cmd[1] + " :" + cmd[2];
+      irc.write(tmp);
+      stamp(now_t, door);
+      if (cmd[1][0] == '#') {
+        door << irc.nick << "/" << cmd[1] << " " << cmd[2] << door::nl;
+      } else {
+        door << cmd[1] << " " << cmd[2] << door::nl;
+      }
+    }
+
     if (cmd[0] == "/me") {
       cmd = split_limit(input, 2);
       std::string tmp =
           "PRIVMSG " + irc.talkto() + " :\x01" + "ACTION " + cmd[1] + "\x01";
       irc.write(tmp);
+      stamp(now_t, door);
       door << "* " << irc.nick << " " << cmd[1] << door::nl;
+    }
+
+    if (cmd[0] == "/help") {
+      door << "IRC Commands :" << door::nl;
+      door << "/help /motd /quit" << door::nl;
+      door << "/me ACTION" << door::nl;
+      door << "/msg TARGET Message" << door::nl;
+      if (allow_part) {
+        door << "/join #CHANNEL" << door::nl;
+        door << "/part #CHANNEL" << door::nl;
+      }
     }
 
     if (cmd[0] == "/info") {
@@ -102,16 +134,16 @@ void parse_input(door::Door &door, ircClient &irc) {
     // where we've said it)
     door::ANSIColor nick_color{door::COLOR::WHITE, door::COLOR::BLUE};
 
+    stamp(now_t, door);
     if (target[0] == '#') {
       door::ANSIColor channel_color = door::ANSIColor{
           door::COLOR::YELLOW, door::COLOR::BLUE, door::ATTR::BOLD};
 
-      door << nick_color << irc.nick << door::ANSIColor(door::COLOR::CYAN)
-           << "/" << channel_color << target << door::reset << " " << input
-           << door::nl;
+      door << channel_color << target << nick_color << "/" << nick_color
+           << irc.nick << door::reset << " " << input << door::nl;
 
     } else {
-      door << nick_color << irc.nick << "/" << target << door::reset << " "
+      door << nick_color << irc.nick << " -> " << target << door::reset << " "
            << input << door::nl;
     }
     irc.write(output);
@@ -119,6 +151,8 @@ void parse_input(door::Door &door, ircClient &irc) {
 
   input.clear();
 }
+
+// can't do /motd it matches /me /msg
 
 const char *hot_keys[] = {"/join #", "/part #", "/talkto ", "/help", "/quit "};
 
@@ -130,8 +164,6 @@ bool check_for_input(door::Door &door, ircClient &irc) {
     // ok, nothing has been displayed at this time.
     if (door.haskey()) {
       // something to do.
-      prompt = "[" + irc.talkto() + "]";
-      door << prompt_color << prompt << input_color << " ";
       c = door.sleep_key(1);
       if (c < 0) {
         // handle timeout/hangup/out of time
@@ -140,6 +172,9 @@ bool check_for_input(door::Door &door, ircClient &irc) {
       if (c > 0x1000)
         return false;
       if (isprint(c)) {
+        prompt = "[" + irc.talkto() + "]";
+        door << prompt_color << prompt << input_color << " ";
+
         door << (char)c;
         input.append(1, c);
       }
@@ -159,6 +194,7 @@ bool check_for_input(door::Door &door, ircClient &irc) {
       if (c > 0x1000)
         return false;
       if (isprint(c)) {
+        // string length check / scroll support?
         door << (char)c;
         input.append(1, c);
         // hot-keys
@@ -183,40 +219,6 @@ bool check_for_input(door::Door &door, ircClient &irc) {
                 break;
               }
             }
-            /*
-          switch (input[1]) {
-          case 'j':
-          case 'J':
-            erase(door, input.size());
-            input = "/join ";
-            door << input;
-            break;
-          case 'p':
-          case 'P':
-            erase(door, input.size());
-            input = "/part ";
-            door << input;
-            break;
-          case 't':
-          case 'T':
-            erase(door, input.size());
-            input = "/talkto ";
-            door << input;
-            break;
-          case 'h':
-          case 'H':
-          case '?':
-            erase(door, input.size());
-            input = "/help";
-            door << input;
-            break;
-          case 'q':
-          case 'Q':
-            erase(door, input.size());
-            input = "/quit ";
-            door << input;
-          }
-          */
           }
         }
       }
@@ -225,15 +227,8 @@ bool check_for_input(door::Door &door, ircClient &irc) {
         if (input[0] == '/') {
           for (auto hk : hot_keys) {
             if (input == hk) {
-              /*
-   if ((input == "/help") or (input == "/talkto ") or
-       (input == "/join ") or (input == "/part ") or
-       (input == "/quit ")) { */
               clear_input(door);
-              /*
-                 erase(door, input.size());
-                 erase(door, prompt.size());
-              */
+
               input.clear();
               prompt.clear();
               return false;
@@ -256,11 +251,8 @@ bool check_for_input(door::Door &door, ircClient &irc) {
       if (c == 0x0d) {
         clear_input(door);
         prompt.clear();
-        /*
-        Should the input be handled/parsed here?
-
-         */
         parse_input(door, irc);
+        input.clear();
         return true;
       }
     }

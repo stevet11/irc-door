@@ -66,9 +66,25 @@ int main(int argc, char *argv[]) {
     update_config = true;
   }
 
+  if (!config["input_delay"]) {
+    config["input_delay"] = "500";
+    update_config = true;
+  }
+
+  if (!config["timestamp_format"]) {
+    config["timestamp_format"] = "%T";
+    update_config = true;
+  }
+
   if (update_config) {
     std::ofstream fout("irc-door.yaml");
+    fout << "# IRC Chat Door configuration" << std::endl;
+    fout << "# to add comments (that don't get destroyed)" << std::endl;
+    fout << "# Add comments as key: values, like:" << std::endl;
+    fout << "# _comment: This will survive the test of time." << std::endl;
+    fout << std::endl;
     fout << config << std::endl;
+    fout << "# end yaml config" << std::endl;
   }
 
   // configure
@@ -78,6 +94,10 @@ int main(int argc, char *argv[]) {
   irc.port = config["port"].as<std::string>();
   irc.username = config["username"].as<std::string>();
   irc.autojoin = config["autojoin"].as<std::string>();
+
+  // set the delay between irc updates
+  ms_input_delay = config["input_delay"].as<int>();
+  timestamp_format = config["timestamp_format"].as<std::string>();
 
   if (config["log"]) {
     irc.debug_output = config["log"].as<std::string>();

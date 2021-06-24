@@ -2,8 +2,11 @@
 
 #include <iomanip>
 
-void stamp(message_stamp &msg_stamp, door::Door &door) {
-  door << std::put_time(std::localtime(&msg_stamp.stamp), "%T ");
+std::string timestamp_format = "%T";
+
+void stamp(std::time_t &stamp, door::Door &door) {
+  door << std::put_time(std::localtime(&stamp), timestamp_format.c_str())
+       << " ";
 }
 
 void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
@@ -12,7 +15,7 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
 
   if (irc_msg.size() == 1) {
     // system message
-    stamp(msg_stamp, door);
+    stamp(msg_stamp.stamp, door);
     door << "(" << irc_msg[0] << ")" << door::nl;
     return;
   }
@@ -23,7 +26,7 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
     std::string tmp = irc_msg[1];
     if (tmp[0] == ':')
       tmp.erase(0, 1);
-    stamp(msg_stamp, door);
+    stamp(msg_stamp.stamp, door);
     door << "* ERROR: " << tmp << door::nl;
   }
 
@@ -33,7 +36,7 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
     channel_topic[1].erase(0, 1);
     std::string output =
         "Topic for " + channel_topic[0] + " is: " + channel_topic[1];
-    stamp(msg_stamp, door);
+    stamp(msg_stamp.stamp, door);
     door << output << door::nl;
   }
 
@@ -42,7 +45,7 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
     std::string channel = split_limit(irc_msg[3], 2)[0];
 
     irc.channels_lock.lock();
-    stamp(msg_stamp, door);
+    stamp(msg_stamp.stamp, door);
     door << "* users on " << channel << " : ";
     for (auto name : irc.channels[channel]) {
       door << name << " ";
@@ -56,7 +59,7 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
     // MOTD
     std::string temp = irc_msg[3];
     temp.erase(0, 1);
-    stamp(msg_stamp, door);
+    stamp(msg_stamp.stamp, door);
     door << "* " << temp << door::nl;
   }
 
@@ -65,24 +68,24 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
     std::string tmp = irc_msg[3];
     if (tmp[0] == ':')
       tmp.erase(0, 1);
-    stamp(msg_stamp, door);
+    stamp(msg_stamp.stamp, door);
     door << "* " << tmp << door::nl;
   }
 
   if (cmd == "NOTICE") {
     std::string tmp = irc_msg[3];
     tmp.erase(0, 1);
-    stamp(msg_stamp, door);
+    stamp(msg_stamp.stamp, door);
     door << parse_nick(irc_msg[0]) << " NOTICE " << tmp << door::nl;
   }
 
   if (cmd == "ACTION") {
     if (irc_msg[2][0] == '#') {
-      stamp(msg_stamp, door);
+      stamp(msg_stamp.stamp, door);
       door << "* " << irc_msg[2] << "/" << parse_nick(irc_msg[0]) << " "
            << irc_msg[3] << door::nl;
     } else {
-      stamp(msg_stamp, door);
+      stamp(msg_stamp.stamp, door);
       door << "* " << parse_nick(irc_msg[0]) << " " << irc_msg[3] << door::nl;
     }
   }
@@ -90,7 +93,7 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
   if (cmd == "TOPIC") {
     std::string tmp = irc_msg[3];
     tmp.erase(0, 1);
-    stamp(msg_stamp, door);
+    stamp(msg_stamp.stamp, door);
     door << parse_nick(irc_msg[0]) << " set topic of " << irc_msg[2] << " to "
          << tmp << door::nl;
   }
@@ -106,13 +109,13 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
         channel_color = door::ANSIColor{door::COLOR::YELLOW, door::COLOR::BLUE,
                                         door::ATTR::BOLD};
       }
-      stamp(msg_stamp, door);
+      stamp(msg_stamp.stamp, door);
       door << channel_color << irc_msg[2] << "/" << nick_color
            << parse_nick(irc_msg[0]) << door::reset << " " << tmp << door::nl;
     } else {
       std::string tmp = irc_msg[3];
       tmp.erase(0, 1);
-      stamp(msg_stamp, door);
+      stamp(msg_stamp.stamp, door);
       door << nick_color << parse_nick(irc_msg[0]) << door::reset << " " << tmp
            << door::nl;
     }
@@ -121,6 +124,7 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
   if (cmd == "NICK") {
     std::string tmp = irc_msg[2];
     tmp.erase(0, 1);
+    stamp(msg_stamp.stamp, door);
     door << "* " << parse_nick(irc_msg[0]) << " is now known as " << tmp
          << door::nl;
   }

@@ -6,6 +6,7 @@
 
 extern bool allow_part;
 extern bool allow_join;
+extern int ms_input_delay;
 
 void clear_input(door::Door &d);
 void restore_input(door::Door &d);
