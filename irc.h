@@ -77,6 +77,7 @@ public:
   };
 
   // channels / users
+  std::atomic<bool> channels_updated;
   boost::signals2::mutex channels_lock;
   std::map<std::string, std::set<std::string>> channels;
 

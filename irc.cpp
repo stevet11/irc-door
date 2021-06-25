@@ -101,6 +101,7 @@ ircClient::ircClient(boost::asio::io_context &io_context)
   nick_retry = 1;
   shutdown = false;
   logging = false;
+  channels_updated = false;
 }
 
 std::ofstream &ircClient::log(void) {
@@ -142,6 +143,7 @@ void ircClient::write(std::string output) {
 void ircClient::message_append(message_stamp &msg) {
   lock.lock();
   messages.push_back(msg);
+  channels_updated = true;
   lock.unlock();
 }
 
@@ -154,6 +156,7 @@ boost::optional<message_stamp> ircClient::message_pop(void) {
   lock.lock();
   message_stamp msg;
   if (messages.empty()) {
+    channels_updated = false;
     lock.unlock();
     return boost::optional<message_stamp>{};
   }
@@ -428,6 +431,9 @@ void ircClient::receive(std::string &text) {
       }
 
       channels_lock.unlock();
+      // Is this us?  If so, change our nick.
+      if (source == nick)
+        nick = msg_to;
     }
 
     if (cmd == "PRIVMSG") {
