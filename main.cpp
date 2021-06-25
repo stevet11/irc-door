@@ -82,6 +82,7 @@ int main(int argc, char *argv[]) {
     fout << "# to add comments (that don't get destroyed)" << std::endl;
     fout << "# Add comments as key: values, like:" << std::endl;
     fout << "# _comment: This will survive the test of time." << std::endl;
+    fout << "# %r AM/PM, %T 24 hour time" << std::endl;
     fout << std::endl;
     fout << config << std::endl;
     fout << "# end yaml config" << std::endl;
@@ -129,18 +130,19 @@ int main(int argc, char *argv[]) {
     boost::optional<message_stamp> msg;
     bool input_cleared = false;
 
-    do {
-      msg = irc.message_pop();
+    if (irc.channels_updated)
+      do {
+        msg = irc.message_pop();
 
-      if (msg) {
-        if (!input_cleared) {
-          input_cleared = true;
-          clear_input(door);
+        if (msg) {
+          if (!input_cleared) {
+            input_cleared = true;
+            clear_input(door);
+          }
+
+          render(*msg, door, irc);
         }
-
-        render(*msg, door, irc);
-      }
-    } while (msg);
+      } while (msg);
 
     if (input_cleared)
       restore_input(door);
