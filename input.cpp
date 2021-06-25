@@ -7,7 +7,8 @@ bool allow_join = false;
 int ms_input_delay = 250;
 std::string input;
 std::string prompt; // mostly for length to erase/restore properly
-int max_input = 100;
+int max_input = 200;
+int input_scroll = 0;
 door::ANSIColor prompt_color{door::COLOR::YELLOW, door::COLOR::BLUE,
                              door::ATTR::BOLD};
 door::ANSIColor input_color{door::COLOR::WHITE}; // , door::COLOR::BLUE};
@@ -22,14 +23,23 @@ void erase(door::Door &d, int count) {
 void clear_input(door::Door &d) {
   if (prompt.empty())
     return;
-  erase(d, input.size());
+
+  if (input_scroll == 0)
+    erase(d, input.size());
+  else
+    erase(d, input.size() - input_scroll + 3);
   erase(d, prompt.size() + 1);
 }
 
 void restore_input(door::Door &d) {
   if (prompt.empty())
     return;
-  d << prompt_color << prompt << input_color << " " << input;
+
+  d << prompt_color << prompt << input_color << " ";
+  if (input_scroll == 0)
+    d << input;
+  else
+    d << "..." << input.substr(input_scroll);
 }
 
 /*
@@ -155,6 +165,7 @@ void parse_input(door::Door &door, ircClient &irc) {
   }
 
   input.clear();
+  input_scroll = 0;
 }
 
 // can't do /motd it matches /me /msg
@@ -164,6 +175,8 @@ const char *hot_keys[] = {"/join #",  "/nick ", "/part #",
 
 bool check_for_input(door::Door &door, ircClient &irc) {
   int c;
+  int width = door.width;
+  int third = width / 3;
 
   // return true when we have input and is "valid" // ready
   if (prompt.empty()) {
@@ -177,13 +190,17 @@ bool check_for_input(door::Door &door, ircClient &irc) {
       }
       if (c > 0x1000)
         return false;
-      if (isprint(c)) {
-        prompt = "[" + irc.talkto() + "]";
-        door << prompt_color << prompt << input_color << " ";
 
-        door << (char)c;
-        input.append(1, c);
-      }
+      // How to handle "early" typing, we we're still connecting...
+      if (!irc.talkto().empty())
+        // don't take any imput unless our talkto has been set.
+        if (isprint(c)) {
+          prompt = "[" + irc.talkto() + "]";
+          door << prompt_color << prompt << input_color << " ";
+
+          door << (char)c;
+          input.append(1, c);
+        }
     }
     return false;
   } else {
@@ -201,8 +218,28 @@ bool check_for_input(door::Door &door, ircClient &irc) {
         return false;
       if (isprint(c)) {
         // string length check / scroll support?
+
+        if ((int)input.size() == max_input) {
+          door << (char)7;
+          return false;
+        }
+
         door << (char)c;
         input.append(1, c);
+
+        int pos = input.size() - input_scroll;
+        if (input_scroll != 0)
+          pos += 3;
+
+        // need something better then magic number here.
+        // 3 is our extra padding here.
+        int prompt_size = prompt.size() + 1; // prompt + space
+        if (pos + prompt_size + 3 == width) {
+          // Ok, scroll!
+          clear_input(door);
+          input_scroll = input.size() - third;
+          restore_input(door);
+        }
         // hot-keys
         if (input[0] == '/') {
           if (input.size() == 2) {
@@ -228,6 +265,16 @@ bool check_for_input(door::Door &door, ircClient &irc) {
           }
         }
       }
+
+      if (c == 0x1b) {
+        // escape key
+        clear_input(door);
+        input.clear();
+        prompt.clear();
+        input_scroll = 0;
+        return false;
+      }
+
       if ((c == 0x08) or (c == 0x7f)) {
         // hot-keys
         if (input[0] == '/') {
@@ -237,6 +284,7 @@ bool check_for_input(door::Door &door, ircClient &irc) {
 
               input.clear();
               prompt.clear();
+              input_scroll = 0;
               return false;
             }
           }
@@ -245,6 +293,17 @@ bool check_for_input(door::Door &door, ircClient &irc) {
           erase(door, 1);
           door << input_color;
           input.erase(input.length() - 1);
+          if (input_scroll != 0) {
+            // are we getting close?
+            if ((int)input.size() - third < input_scroll) {
+              // scroll the other way
+              clear_input(door);
+              input_scroll = (input.size() - 2 * third);
+              if (input_scroll < 0)
+                input_scroll = 0;
+              restore_input(door);
+            }
+          }
         } else {
           // erasing the last character
           erase(door, 1);
@@ -259,6 +318,7 @@ bool check_for_input(door::Door &door, ircClient &irc) {
         prompt.clear();
         parse_input(door, irc);
         input.clear();
+        input_scroll = 0;
         return true;
       }
     }
