@@ -104,9 +104,14 @@ void parse_input(door::Door &door, ircClient &irc) {
       door << "* " << irc.nick << " " << cmd[1] << door::nl;
     }
 
+    if (cmd[0] == "/nick") {
+      std::string tmp = "NICK " + cmd[1];
+      irc.write(tmp);
+    }
+
     if (cmd[0] == "/help") {
       door << "IRC Commands :" << door::nl;
-      door << "/help /motd /quit" << door::nl;
+      door << "/help /motd /quit /nick" << door::nl;
       door << "/me ACTION" << door::nl;
       door << "/msg TARGET Message" << door::nl;
       if (allow_part) {
@@ -154,7 +159,8 @@ void parse_input(door::Door &door, ircClient &irc) {
 
 // can't do /motd it matches /me /msg
 
-const char *hot_keys[] = {"/join #", "/part #", "/talkto ", "/help", "/quit "};
+const char *hot_keys[] = {"/join #",  "/nick ", "/part #",
+                          "/talkto ", "/help",  "/quit "};
 
 bool check_for_input(door::Door &door, ircClient &irc) {
   int c;
