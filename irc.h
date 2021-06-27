@@ -80,6 +80,7 @@ public:
   std::atomic<bool> channels_updated;
   boost::signals2::mutex channels_lock;
   std::map<std::string, std::set<std::string>> channels;
+  std::atomic<int> max_nick_length;
 
   void message(std::string msg);
   std::atomic<bool> shutdown;
@@ -92,6 +93,7 @@ public:
   std::atomic<bool> registered;
 
 private:
+  void find_max_nick_length(void);
   boost::signals2::mutex lock;
   std::vector<message_stamp> messages;
 

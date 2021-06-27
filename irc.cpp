@@ -325,7 +325,10 @@ void ircClient::receive(std::string &text) {
         std::string output = source + " has joined " += msg_to;
         message(output);
         channels[msg_to].insert(source);
+        if ((int)source.size() > max_nick_length)
+          max_nick_length = (int)source.size();
       }
+
       channels_lock.unlock();
     }
 
@@ -354,6 +357,8 @@ void ircClient::receive(std::string &text) {
         message(output);
         channels[msg_to].erase(source);
       }
+
+      find_max_nick_length();
       channels_lock.unlock();
     }
 
@@ -374,6 +379,8 @@ void ircClient::receive(std::string &text) {
       } else {
         channels[msg_to].erase(wholeft);
       }
+
+      find_max_nick_length();
       channels_lock.unlock();
       message(output);
     }
@@ -392,6 +399,7 @@ void ircClient::receive(std::string &text) {
           // would it be possible that channel is empty now?
           // no, because we're still in it.
         }
+        find_max_nick_length();
       }
       channels_lock.unlock();
     }
@@ -417,6 +425,8 @@ void ircClient::receive(std::string &text) {
         remove_channel_modes(name);
         channels[channel].insert(name);
       }
+
+      find_max_nick_length();
       channels_lock.unlock();
     }
 
@@ -430,6 +440,7 @@ void ircClient::receive(std::string &text) {
         }
       }
 
+      find_max_nick_length();
       channels_lock.unlock();
       // Is this us?  If so, change our nick.
       if (source == nick)
@@ -525,6 +536,7 @@ void ircClient::receive(std::string &text) {
 
     if ((parts[1] == "376") or (parts[1] == "422")) {
       // END MOTD, or MOTD MISSING
+      find_max_nick_length(); // start with ourself.
       registered = true;
       if (!autojoin.empty()) {
         std::string msg = "JOIN " + autojoin;
@@ -543,6 +555,29 @@ void ircClient::receive(std::string &text) {
   // :FROM command TO :rest and ':' is optional
 
   // std::cout << text << "\n";
+}
+
+/**
+ * @brief find max nick length
+ *
+ * This is for formatting the messages.
+ * We run through the channels checking all the users,
+ * and also checking our own nick.
+ *
+ * This updates \ref max_nick_length
+ */
+void ircClient::find_max_nick_length(void) {
+  int max = 0;
+  for (auto const &ch : channels) {
+    for (auto const &nick : ch.second) {
+      if ((int)nick.size() > max)
+        max = (int)nick.size();
+    }
+  }
+  // check our nick against this too.
+  if ((int)nick.size() > max)
+    max = (int)nick.size();
+  max_nick_length = max;
 }
 
 std::string ircClient::registration(void) {
