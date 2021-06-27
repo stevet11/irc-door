@@ -89,12 +89,12 @@ public:
   boost::optional<message_stamp> message_pop(void);
 
   std::vector<std::string> errors;
+  std::atomic<bool> registered;
 
 private:
   boost::signals2::mutex lock;
   std::vector<message_stamp> messages;
 
-  bool registered;
   std::string original_nick;
   int nick_retry;
 

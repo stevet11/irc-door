@@ -71,6 +71,14 @@ void parse_input(door::Door &door, ircClient &irc) {
       irc.write("MOTD");
     }
 
+    if (cmd[0] == "/names") {
+      std::string talk = irc.talkto();
+      if (talk[0] == '#') {
+        // or we could pull this from /info & talk.
+        irc.write("NAMES " + talk);
+      }
+    }
+
     if (cmd[0] == "/quit") {
       irc.write("QUIT");
     }
@@ -94,6 +102,7 @@ void parse_input(door::Door &door, ircClient &irc) {
       }
     }
 
+    // TODO: feed this and /me to render so DRY/one place to render
     if (cmd[0] == "/msg") {
       std::string tmp = "PRIVMSG " + cmd[1] + " :" + cmd[2];
       irc.write(tmp);
@@ -169,9 +178,9 @@ void parse_input(door::Door &door, ircClient &irc) {
 }
 
 // can't do /motd it matches /me /msg
+// nick matches names.
 
-const char *hot_keys[] = {"/join #",  "/nick ", "/part #",
-                          "/talkto ", "/help",  "/quit "};
+const char *hot_keys[] = {"/join #", "/part #", "/talkto ", "/help", "/quit "};
 
 bool check_for_input(door::Door &door, ircClient &irc) {
   int c;
@@ -192,7 +201,8 @@ bool check_for_input(door::Door &door, ircClient &irc) {
         return false;
 
       // How to handle "early" typing, we we're still connecting...
-      if (!irc.talkto().empty())
+      // FAIL-WHALE (what if we part all channels?)
+      if (irc.registered)
         // don't take any imput unless our talkto has been set.
         if (isprint(c)) {
           prompt = "[" + irc.talkto() + "]";
