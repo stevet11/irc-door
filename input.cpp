@@ -76,7 +76,7 @@ void parse_input(door::Door &door, ircClient &irc) {
       if (talk[0] == '#') {
         // or we could pull this from /info & talk.
         irc.write("NAMES " + talk);
-      }
+      } // handle this input error
     }
 
     if (cmd[0] == "/quit") {
@@ -106,12 +106,19 @@ void parse_input(door::Door &door, ircClient &irc) {
     if (cmd[0] == "/msg") {
       std::string tmp = "PRIVMSG " + cmd[1] + " :" + cmd[2];
       irc.write(tmp);
+      // build msg for render
+      tmp = ":" + irc.nick + "!" + " " + tmp;
+      message_stamp msg;
+      msg.buffer = irc_split(tmp);
+      render(msg, door, irc);
+      /*
       stamp(now_t, door);
       if (cmd[1][0] == '#') {
         door << irc.nick << "/" << cmd[1] << " " << cmd[2] << door::nl;
       } else {
         door << cmd[1] << " " << cmd[2] << door::nl;
       }
+      */
     }
 
     if (cmd[0] == "/me") {
@@ -119,8 +126,15 @@ void parse_input(door::Door &door, ircClient &irc) {
       std::string tmp =
           "PRIVMSG " + irc.talkto() + " :\x01" + "ACTION " + cmd[1] + "\x01";
       irc.write(tmp);
+      // build msg for render
+      tmp = ":" + irc.nick + "!" + " ACTION " + irc.talkto() + " " + cmd[1];
+      message_stamp msg;
+      msg.buffer = irc_split(tmp);
+      render(msg, door, irc);
+      /*
       stamp(now_t, door);
       door << "* " << irc.nick << " " << cmd[1] << door::nl;
+      */
     }
 
     if (cmd[0] == "/nick") {
@@ -158,6 +172,14 @@ void parse_input(door::Door &door, ircClient &irc) {
     // where we've said it)
     door::ANSIColor nick_color{door::COLOR::WHITE, door::COLOR::BLUE};
 
+    irc.write(output);
+
+    // build message for render
+    message_stamp msg;
+    output = ":" + irc.nick + "!" + " " + output;
+    msg.buffer = irc_split(output);
+    render(msg, door, irc);
+    /*
     stamp(now_t, door);
     if (target[0] == '#') {
       door::ANSIColor channel_color = door::ANSIColor{
@@ -170,7 +192,7 @@ void parse_input(door::Door &door, ircClient &irc) {
       door << nick_color << irc.nick << " -> " << target << door::reset << " "
            << input << door::nl;
     }
-    irc.write(output);
+    */
   }
 
   input.clear();

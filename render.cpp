@@ -13,6 +13,16 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
   // std::vector<std::string> irc_msg = *msg;
   std::vector<std::string> &irc_msg = msg_stamp.buffer;
 
+  {
+    ofstream &log = door.log();
+
+    log << "render: ";
+    for (auto text : irc_msg) {
+      log << "[" << text << "] ";
+    }
+    log << std::endl;
+  }
+
   if (irc_msg.size() == 1) {
     // system message
     stamp(msg_stamp.stamp, door);
