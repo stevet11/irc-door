@@ -439,12 +439,12 @@ void ircClient::receive(std::string &text) {
           ch.second.insert(msg_to);
         }
       }
-
-      find_max_nick_length();
-      channels_lock.unlock();
       // Is this us?  If so, change our nick.
       if (source == nick)
         nick = msg_to;
+
+      find_max_nick_length();
+      channels_lock.unlock();
     }
 
     if (cmd == "PRIVMSG") {
