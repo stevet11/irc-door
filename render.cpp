@@ -249,4 +249,77 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
     door << info << "* " << parse_nick(irc_msg[0]) << " is now known as " << tmp
          << door::reset << door::nl;
   }
+
+  if (cmd == "MODE") {
+    // [:ChanServ!services@services.red-green.com] [MODE] [#chat] [+o Apollo]
+    // ChanServ gives channel operator status to bugz
+
+    std::string target = irc_msg[2];
+    std::string nick = parse_nick(irc_msg[0]);
+    std::string modes = irc_msg[3];
+
+    if (target[0] == '#') {
+      // pay attention to channel modes.  Forget user modes for now.
+      std::string mode = modes.substr(0, 2);
+
+      if (mode == "+s") {
+        stamp(msg_stamp.stamp, door);
+        door << info << "* " << nick << " sets channel " << target
+             << " to secret" << door::reset << door::nl;
+      }
+      if (mode == "-s") {
+        stamp(msg_stamp.stamp, door);
+        door << info << "* " << nick << " removes channel " << target
+             << " secret" << door::reset << door::nl;
+      }
+
+      if (mode == "+i") {
+        stamp(msg_stamp.stamp, door);
+        door << info << "* " << nick << " sets channel " << target
+             << " to invite only" << door::reset << door::nl;
+      }
+      if (mode == "-i") {
+        stamp(msg_stamp.stamp, door);
+        door << info << "* " << nick << " removes channel " << target
+             << " invite only" << door::reset << door::nl;
+      }
+
+      if (mode == "+m") {
+        stamp(msg_stamp.stamp, door);
+        door << info << "* " << nick << " sets channel " << target
+             << " to moderated" << door::reset << door::nl;
+      }
+      if (mode == "-m") {
+        stamp(msg_stamp.stamp, door);
+        door << info << "* " << nick << " removes channel " << target
+             << " moderated" << door::reset << door::nl;
+      }
+
+      // modes on a user in the channel
+      if (mode == "+o") {
+        modes.erase(0, 3);
+        stamp(msg_stamp.stamp, door);
+        door << info << "* " << nick << " gives " << modes << " ops on "
+             << target << door::reset << door::nl;
+      }
+      if (mode == "-o") {
+        modes.erase(0, 3);
+        stamp(msg_stamp.stamp, door);
+        door << info << "* " << nick << " removes " << modes << " ops on "
+             << target << door::reset << door::nl;
+      }
+      if (mode == "+v") {
+        modes.erase(0, 3);
+        stamp(msg_stamp.stamp, door);
+        door << info << "* " << nick << " gives " << modes << " voice on "
+             << target << door::reset << door::nl;
+      }
+      if (mode == "-v") {
+        modes.erase(0, 3);
+        stamp(msg_stamp.stamp, door);
+        door << info << "* " << nick << " removes " << modes << " voice on "
+             << target << door::reset << door::nl;
+      }
+    }
+  }
 }
