@@ -142,8 +142,12 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
     std::string tmp = irc_msg[3];
     tmp.erase(0, 1);
     stamp(msg_stamp.stamp, door);
-    door << nick_color << parse_nick(irc_msg[0]) << " NOTICE " << tmp
-         << door::reset << door::nl;
+    int left = stamp_length;
+    std::string nick = parse_nick(irc_msg[0]);
+    door << nick_color << nick << " NOTICE ";
+    left += nick.size() + 8;
+    word_wrap(left, door, tmp);
+    // << tmp << door::reset << door::nl;
   }
 
   if (cmd == "ACTION") {
