@@ -25,7 +25,7 @@ void stamp(std::time_t &stamp, door::Door &door) {
 }
 
 void word_wrap(int left_side, door::Door &door, std::string text) {
-  int workarea = door.width - left_side;
+  int workarea = door.width - (left_side + 1);
   bool first_line = true;
   door::ANSIColor color = door.previous;
 
