@@ -3,6 +3,7 @@
 
 bool allow_part = false;
 bool allow_join = false;
+bool has_quit = false;
 
 int ms_input_delay = 250;
 std::string input;
@@ -219,6 +220,12 @@ bool check_for_input(door::Door &door, ircClient &irc) {
       c = door.sleep_key(1);
       if (c < 0) {
         // handle timeout/hangup/out of time
+        if (c < -1) {
+          if (!has_quit) {
+            irc.write("QUIT");
+            has_quit = true;
+          }
+        }
         return false;
       }
       if (c > 0x1000)
@@ -240,7 +247,12 @@ bool check_for_input(door::Door &door, ircClient &irc) {
   } else {
     // continue on with what we have displayed.
     c = door.sleep_ms_key(ms_input_delay);
-    if (c != -1) {
+    if (c < -1) {
+      if (!has_quit) {
+        irc.write("QUIT");
+        has_quit = true;
+      }
+    } else if (c != -1) {
       /*
       c = door.sleep_key(1);
       if (c < 0) {
