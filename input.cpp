@@ -7,7 +7,7 @@ bool allow_join = false;
 int ms_input_delay = 250;
 std::string input;
 std::string prompt; // mostly for length to erase/restore properly
-int max_input = 200;
+int max_input = 220;
 int input_scroll = 0;
 door::ANSIColor prompt_color{door::COLOR::YELLOW, door::COLOR::BLUE,
                              door::ATTR::BOLD};
@@ -147,10 +147,12 @@ void parse_input(door::Door &door, ircClient &irc) {
       door << "/help /motd /quit /nick" << door::nl;
       door << "/me ACTION" << door::nl;
       door << "/msg TARGET Message" << door::nl;
+
       if (allow_part) {
         door << "/join #CHANNEL" << door::nl;
         door << "/part #CHANNEL" << door::nl;
       }
+      door << "[ESC] aborts input" << door::nl;
     }
 
     if (cmd[0] == "/info") {
