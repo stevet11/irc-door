@@ -29,8 +29,10 @@ void word_wrap(int left_side, door::Door &door, std::string text) {
   bool first_line = true;
   door::ANSIColor color = door.previous;
 
-  door.log() << "word_wrap " << left_side << " area " << workarea << " ["
-             << text << "]" << std::endl;
+  /*
+    door.log() << "word_wrap " << left_side << " area " << workarea << " ["
+               << text << "]" << std::endl;
+  */
 
   while (text.size() > 0) {
     if (!first_line) {
