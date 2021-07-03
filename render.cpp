@@ -139,6 +139,7 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
   }
 
   if (cmd == "NOTICE") {
+    // NOTICE doesn't display the target (nick or channel)
     std::string tmp = irc_msg[3];
     tmp.erase(0, 1);
     stamp(msg_stamp.stamp, door);
@@ -257,6 +258,10 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
   if (cmd == "MODE") {
     // [:ChanServ!services@services.red-green.com] [MODE] [#chat] [+o Apollo]
     // ChanServ gives channel operator status to bugz
+
+    // Or, lets just keep it simple and do something like:
+    // source sets target mode [whatever]
+    // If not a channel: source sets target mode [whatever]
 
     std::string target = irc_msg[2];
     std::string nick = parse_nick(irc_msg[0]);

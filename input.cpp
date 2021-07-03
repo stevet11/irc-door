@@ -122,6 +122,16 @@ void parse_input(door::Door &door, ircClient &irc) {
       */
     }
 
+    if (cmd[0] == "/notice") {
+      std::string tmp = "NOTICE " + cmd[1] + " :" + cmd[2];
+      irc.write(tmp);
+      // build msg for render
+      tmp = ":" + irc.nick + "!" + " " + tmp;
+      message_stamp msg;
+      msg.buffer = irc_split(tmp);
+      render(msg, door, irc);
+    }
+
     if (cmd[0] == "/me") {
       cmd = split_limit(input, 2);
       std::string tmp =
