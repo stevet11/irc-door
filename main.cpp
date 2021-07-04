@@ -95,6 +95,7 @@ int main(int argc, char *argv[]) {
   irc.port = config["port"].as<std::string>();
   irc.username = config["username"].as<std::string>();
   irc.autojoin = config["autojoin"].as<std::string>();
+  irc.version = "Bugz IRC Door 0.1 (C) 2021 Red-Green Software";
 
   // set the delay between irc updates
   ms_input_delay = config["input_delay"].as<int>();

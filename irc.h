@@ -53,6 +53,7 @@ public:
   std::string username = "bzbz";
   std::string realname;
   std::string autojoin;
+  std::string version;
 
   // filename to use for logfile
   std::string debug_output;
@@ -86,7 +87,7 @@ public:
   std::atomic<bool> shutdown;
 
   // thread-safe messages access
-  void message_append(message_stamp &msg);
+  virtual void message_append(message_stamp &msg);
   boost::optional<message_stamp> message_pop(void);
 
   std::vector<std::string> errors;

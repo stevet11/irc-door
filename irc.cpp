@@ -116,6 +116,7 @@ ircClient::ircClient(boost::asio::io_context &io_context)
   shutdown = false;
   logging = false;
   channels_updated = false;
+  version = "Bugz IRC thing V0.1";
 }
 
 std::ofstream &ircClient::log(void) {
@@ -480,9 +481,8 @@ void ircClient::receive(std::string &text) {
 
         if (message == "VERSION") {
           std::string reply_to = parse_nick(source);
-          boost::format fmt =
-              boost::format("NOTICE %1% :\x01VERSION Bugz IRC thing V0.1\x01") %
-              reply_to;
+          boost::format fmt = boost::format("NOTICE %1% :\x01VERSION %2%\x01") %
+                              reply_to % version;
           std::string response = fmt.str();
           write(response);
           return;
