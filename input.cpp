@@ -138,7 +138,7 @@ void parse_input(door::Door &door, ircClient &irc) {
           "PRIVMSG " + irc.talkto() + " :\x01" + "ACTION " + cmd[1] + "\x01";
       irc.write(tmp);
       // build msg for render
-      tmp = ":" + irc.nick + "!" + " ACTION " + irc.talkto() + " " + cmd[1];
+      tmp = ":" + irc.nick + "!" + " ACTION " + irc.talkto() + " :" + cmd[1];
       message_stamp msg;
       msg.buffer = irc_split(tmp);
       render(msg, door, irc);

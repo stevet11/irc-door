@@ -83,22 +83,28 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
       door::ANSIColor{door::COLOR::YELLOW, door::COLOR::BLUE, door::ATTR::BOLD};
   door::ANSIColor text_color{door::COLOR::WHITE};
 
-  std::string cmd = irc_msg[1];
+  std::string &source = irc_msg[0];
+  std::string &cmd = irc_msg[1];
+  std::string target;
+  if (irc_msg.size() > 2)
+    target = irc_msg[2];
+  std::string msg;
+  if (irc_msg.size() > 3)
+    msg = irc_msg[irc_msg.size() - 1];
 
-  if (irc_msg[0] == "ERROR") {
-    std::string tmp = irc_msg[1];
+  if (source == "ERROR") {
+    std::string tmp = cmd;
+    /*
     if (tmp[0] == ':')
       tmp.erase(0, 1);
+      */
     stamp(msg_stamp.stamp, door);
     door << error << "* ERROR: " << tmp << door::reset << door::nl;
   }
 
   if (cmd == "332") {
     // joined channel with topic
-    std::vector<std::string> channel_topic = split_limit(irc_msg[3], 2);
-    channel_topic[1].erase(0, 1);
-    std::string output =
-        "Topic for " + channel_topic[0] + " is: " + channel_topic[1];
+    std::string output = "Topic for " + irc_msg[3] + " is: " + msg;
     stamp(msg_stamp.stamp, door);
     int left = stamp_length;
     door << info;
@@ -108,13 +114,19 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
 
   if (cmd == "366") {
     // end of names, output and clear
-    std::string channel = split_limit(irc_msg[3], 2)[0];
+    std::string channel = irc_msg[3]; // split_limit(irc_msg[3], 2)[0];
 
     irc.channels_lock.lock();
     stamp(msg_stamp.stamp, door);
-    door << info << "* users on " << channel << " : ";
-    for (auto name : irc.channels[channel]) {
-      door << name << " ";
+    int count = irc.channels[channel].size();
+
+    if (count > 10) {
+      door << info << "* " << count << " users on " << channel;
+    } else {
+      door << info << "* users on " << channel << " : ";
+      for (auto name : irc.channels[channel]) {
+        door << name << " ";
+      }
     }
     irc.channels_lock.unlock();
     door << door::reset << door::nl;
@@ -123,19 +135,19 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
 
   if (cmd == "372") {
     // MOTD
-    std::string temp = irc_msg[3];
-    temp.erase(0, 1);
+    // std::string temp = irc_msg[3];
+    // temp.erase(0, 1);
     stamp(msg_stamp.stamp, door);
-    door << info << "* " << temp << door::reset << door::nl;
+    door << info << "* " << msg << door::reset << door::nl;
   }
 
   // 400 and 500 are errors?  should show those.
   if ((cmd[0] == '4') or (cmd[0] == '5')) {
-    std::string tmp = irc_msg[3];
-    if (tmp[0] == ':')
-      tmp.erase(0, 1);
+    // std::string tmp = irc_msg[3];
+    // if (tmp[0] == ':')
+    //  tmp.erase(0, 1);
     stamp(msg_stamp.stamp, door);
-    door << error << "* " << tmp << door::reset << door::nl;
+    door << error << "* " << msg << door::reset << door::nl;
   }
 
   if (cmd == "NOTICE") {
@@ -152,17 +164,18 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
   }
 
   if (cmd == "ACTION") {
-    if (irc_msg[2][0] == '#') {
+    // if (irc_msg[2][0] == '#') {
+    if (target[0] == '#') {
       stamp(msg_stamp.stamp, door);
       int left = stamp_length;
-      if (irc_msg[2] == irc.talkto())
+      if (target == irc.talkto())
         door << active_channel_color;
       else
         door << channel_color;
-      door << irc_msg[2] << "/" << nick_color;
-      left += irc_msg[2].size() + 1;
+      door << target << "/" << nick_color;
+      left += target.size() + 1;
 
-      std::string nick = parse_nick(irc_msg[0]);
+      std::string nick = parse_nick(source);
       left += nick.size();
       int len = irc.max_nick_length - nick.size();
       if (len > 0) {
@@ -171,7 +184,7 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
       }
       left += 3;
       door << "* " << nick << " ";
-      word_wrap(left, door, irc_msg[3]);
+      word_wrap(left, door, msg); // irc_msg[3]);
       // << irc_msg[3] << door::reset << door::nl;
       /*
       door << "* " << irc_msg[2] << "/" << parse_nick(irc_msg[0]) << " "
@@ -180,10 +193,10 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
     } else {
       stamp(msg_stamp.stamp, door);
       int left = stamp_length;
-      std::string nick = parse_nick(irc_msg[0]);
+      std::string nick = parse_nick(source);
       door << nick_color << "* " << nick << " ";
       left += 3 + nick.size();
-      word_wrap(left, door, irc_msg[3]);
+      word_wrap(left, door, msg); // irc_msg[3]);
       // << irc_msg[3] << door::reset << door::nl;
 
       // door << "* " << parse_nick(irc_msg[0]) << " " << irc_msg[3] <<
@@ -205,21 +218,20 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
   }
 
   if (cmd == "PRIVMSG") {
-    if (irc_msg[2][0] == '#') {
-      std::string tmp = irc_msg[3];
-      tmp.erase(0, 1);
+    if (target[0] == '#') {
+      // std::string tmp = irc_msg[3];
+      // tmp.erase(0, 1);
 
       stamp(msg_stamp.stamp, door);
       int left = stamp_length;
 
-      if (irc_msg[2] == irc.talkto())
+      if (target == irc.talkto())
         door << active_channel_color;
       else
         door << channel_color;
-      door << irc_msg[2];
-      door << "/" << nick_color;
-      left += irc_msg[2].size() + 1;
-      std::string nick = parse_nick(irc_msg[0]);
+      door << target << "/" << nick_color;
+      left += target.size() + 1;
+      std::string nick = parse_nick(source);
       left += nick.size();
       int len = irc.max_nick_length + 2 - nick.size();
       if (len > 0) {
@@ -228,31 +240,31 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
       }
       door << nick << " " << text_color;
       left++;
-      word_wrap(left, door, tmp);
+      word_wrap(left, door, msg); // tmp);
       // << tmp << door::reset << door::nl;
       /*
       door << channel_color << irc_msg[2] << "/" << nick_color
            << parse_nick(irc_msg[0]) << door::reset << " " << tmp << door::nl;
       */
     } else {
-      std::string tmp = irc_msg[3];
-      tmp.erase(0, 1);
+      // std::string tmp = irc_msg[3];
+      // tmp.erase(0, 1);
       stamp(msg_stamp.stamp, door);
       int left = stamp_length;
       std::string nick = parse_nick(irc_msg[0]);
       door << nick_color << nick << door::reset << " ";
       left += nick.size() + 1;
-      word_wrap(left, door, tmp);
+      word_wrap(left, door, msg);
       // << tmp << door::nl;
     }
   }
 
   if (cmd == "NICK") {
-    std::string tmp = irc_msg[2];
-    tmp.erase(0, 1);
+    // std::string tmp = irc_msg[2];
+    // tmp.erase(0, 1);
     stamp(msg_stamp.stamp, door);
-    door << info << "* " << parse_nick(irc_msg[0]) << " is now known as " << tmp
-         << door::reset << door::nl;
+    door << info << "* " << parse_nick(irc_msg[0]) << " is now known as "
+         << target << door::reset << door::nl;
   }
 
   if (cmd == "MODE") {

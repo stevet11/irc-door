@@ -59,9 +59,23 @@ std::vector<std::string> split_limit(std::string &text, int max) {
  * @return std::vector<std::string>
  */
 std::vector<std::string> irc_split(std::string &text) {
+  size_t msgpos = text.find(" :");
+  std::string message;
+  if (msgpos != std::string::npos) {
+    message = text.substr(msgpos + 2);
+    text.erase(msgpos);
+  }
+  std::vector<std::string> results;
+
+  /*
   if (text[0] != ':')
-    return split_limit(text, 2);
-  return split_limit(text, 4);
+    results = split_limit(text, 2);
+  results = split_limit(text, 4);
+  */
+  results = split_limit(text, -1);
+  if (!message.empty())
+    results.push_back(message);
+  return results;
 }
 
 /**
@@ -274,7 +288,7 @@ void ircClient::message(std::string msg) {
 void ircClient::receive(std::string &text) {
   message_stamp ms;
   ms.buffer = irc_split(text);
-  std::vector<std::string> &parts = ms.buffer; // irc_split(text);
+  std::vector<std::string> &parts = ms.buffer;
 
   if (logging) {
     // this also shows our parser working
@@ -299,22 +313,26 @@ void ircClient::receive(std::string &text) {
 
   if (parts.size() >= 3) {
     std::string source = parse_nick(parts[0]);
-    std::string cmd = parts[1];
-    std::string msg_to = parts[2];
+    std::string &cmd = parts[1];
+    std::string &msg_to = parts[2];
 
     std::string msg;
-    if (parts.size() == 4) {
-      msg = parts[3];
+    if (parts.size() >= 4) {
+      msg = parts[parts.size() - 1];
+    }
+
+    if (logging) {
+      // this also shows our parser working
+      std::ofstream &l = log();
+      l << "IRC: [SRC:" << source << "] [CMD:" << cmd << "] [TO:" << msg_to
+        << "] [MSG:" << msg << "]" << std::endl;
     }
 
     if (cmd == "JOIN") {
-      msg_to.erase(0, 1); // channel
-
       channels_lock.lock();
       if (nick == source) {
         // yes, we are joining
-        std::string output =
-            "You have joined " + msg_to + " [talkto = " + msg_to + "]";
+        std::string output = "You have joined " + msg_to;
         message(output);
         talkto(msg_to);
         // insert empty set here.
@@ -343,11 +361,11 @@ void ircClient::receive(std::string &text) {
 
         if (!channels.empty()) {
           talkto(channels.begin()->first);
-          output += " [talkto = " + talkto() + "]";
+          // output += " [talkto = " + talkto() + "]";
         } else {
           talkto("");
         }
-        message(output);
+        // message(output);
 
       } else {
         std::string output = source + " has left " + msg_to;
@@ -363,12 +381,11 @@ void ircClient::receive(std::string &text) {
     }
 
     if (cmd == "KICK") {
-      std::string wholeft = split_limit(parts[3], 2)[0];
       std::string output =
-          source + " has kicked " + wholeft + " from " + msg_to;
+          source + " has kicked " + parts[3] + " from " + msg_to;
 
       channels_lock.lock();
-      if (wholeft == nick) {
+      if (parts[3] == nick) {
         channels.erase(msg_to);
         if (!channels.empty()) {
           talkto(channels.begin()->first);
@@ -377,7 +394,7 @@ void ircClient::receive(std::string &text) {
           talkto("");
         }
       } else {
-        channels[msg_to].erase(wholeft);
+        channels[msg_to].erase(parts[3]);
       }
 
       find_max_nick_length();
@@ -407,13 +424,7 @@ void ircClient::receive(std::string &text) {
     if (cmd == "353") {
       // NAMES list for channel
       std::vector<std::string> names_list = split_limit(msg);
-      names_list.erase(names_list.begin());
-      std::string channel = names_list.front();
-      names_list.erase(names_list.begin());
-
-      if ((names_list.size() > 0) and (names_list[0][0] == ':')) {
-        names_list[0].erase(0, 1);
-      }
+      std::string channel = parts[4];
 
       channels_lock.lock();
       if (channels.find(channel) == channels.end()) {
@@ -431,7 +442,7 @@ void ircClient::receive(std::string &text) {
     }
 
     if (cmd == "NICK") {
-      msg_to.erase(0, 1);
+      // msg_to.erase(0, 1);
 
       channels_lock.lock();
       for (auto &ch : channels) {
@@ -450,26 +461,25 @@ void ircClient::receive(std::string &text) {
     if (cmd == "PRIVMSG") {
       // Possibly a CTCP request.  Let's see
       std::string message = msg;
-      if ((message[0] == ':') and (message[1] == '\x01') and
-          (message[message.size() - 1] == '\x01')) {
+      if ((message[0] == '\x01') and (message[message.size() - 1] == '\x01')) {
         // CTCP MESSAGE FOUND  strip \x01's
-        message.erase(0, 2);
+        message.erase(0, 1);
         message.erase(message.size() - 1);
 
         std::vector<std::string> ctcp_cmd = split_limit(message, 2);
 
         if (ctcp_cmd[0] != "ACTION") {
           std::string msg =
-              "Received CTCP " + ctcp_cmd[0] + " from " + parse_nick(parts[0]);
+              "Received CTCP " + ctcp_cmd[0] + " from " + parse_nick(source);
           this->message(msg);
           if (logging) {
-            log() << "CTCP : [" << message << "] from " + parse_nick(parts[0])
+            log() << "CTCP : [" << message << "] from " + parse_nick(source)
                   << std::endl;
           }
         }
 
         if (message == "VERSION") {
-          std::string reply_to = parse_nick(parts[0]);
+          std::string reply_to = parse_nick(source);
           boost::format fmt =
               boost::format("NOTICE %1% :\x01VERSION Bugz IRC thing V0.1\x01") %
               reply_to;
@@ -481,7 +491,7 @@ void ircClient::receive(std::string &text) {
         if (message.substr(0, 5) == "PING ") {
           message.erase(0, 5);
           boost::format fmt = boost::format("NOTICE %1% :\x01PING %2%\x01") %
-                              parse_nick(parts[0]) % message;
+                              parse_nick(source) % message;
           std::string response = fmt.str();
           write(response);
           return;
@@ -494,7 +504,7 @@ void ircClient::receive(std::string &text) {
               std::put_time(std::localtime(&in_time_t), "%c"));
 
           boost::format fmt = boost::format("NOTICE %1% :\x01TIME %2%\x01") %
-                              parse_nick(parts[0]) % datetime;
+                              parse_nick(source) % datetime;
           std::string response = fmt.str();
           write(response);
           return;
@@ -504,9 +514,11 @@ void ircClient::receive(std::string &text) {
           message.erase(0, 7);
           parts[1] = "ACTION"; // change PRIVMSG to ACTION
           parts[3] = message;
+        } else {
+          // What should I do with unknown CTCP commands?
+          // Unknown CTCP command.  Eat it.
+          return;
         }
-
-        // I have this parsed this far, now what can I do with it?!
       }
     }
   }
