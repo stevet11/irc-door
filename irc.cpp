@@ -108,15 +108,28 @@ using namespace std::placeholders;
 
 typedef std::function<void(std::string &)> receiveFunction;
 
+#ifdef SENDQ
+ircClient::ircClient(boost::asio::io_context &io_context)
+    : resolver{io_context}, ssl_context{boost::asio::ssl::context::tls},
+      socket{io_context, ssl_context},
+      sendq_timer{io_context}, context{io_context} {
+#else
 ircClient::ircClient(boost::asio::io_context &io_context)
     : resolver{io_context}, ssl_context{boost::asio::ssl::context::tls},
       socket{io_context, ssl_context}, context{io_context} {
+#endif
   registered = false;
   nick_retry = 1;
   shutdown = false;
   logging = false;
   channels_updated = false;
   version = "Bugz IRC thing V0.1";
+#ifdef SENDQ
+  sendq_current = 0;
+  sendq_active = false;
+  sendq_ms = 500;
+  sendq_current = 0;
+#endif
 }
 
 std::ofstream &ircClient::log(void) {
@@ -149,6 +162,72 @@ void ircClient::write(std::string output) {
     }
   }
 }
+
+#ifdef SENDQ
+void ircClient::write_queue(std::string target, std::string output) {
+  // is target in sendq_targets
+  bool found = false;
+  for (auto &t : sendq_targets) {
+    if (t == target) {
+      found = true;
+      break;
+    }
+  }
+
+  if (!found) {
+    sendq_targets.push_back(target);
+  };
+
+  sendq[target].push_back(output);
+
+  if (!sendq_active) {
+    sendq_active = true;
+    sendq_current = 0;
+    sendq_timer.expires_after(std::chrono::milliseconds(sendq_ms));
+    sendq_timer.async_wait(std::bind(&ircClient::on_sendq, this, _1));
+  }
+}
+
+void ircClient::on_sendq(error_code error) {
+  std::string &target = sendq_targets[sendq_current];
+
+  // calculate the next target
+  ++sendq_current;
+  if (sendq_current >= (int)sendq_targets.size())
+    sendq_current = 0;
+
+  std::string output = sendq[target].front();
+  sendq[target].erase(sendq[target].begin());
+  write(output);
+
+  if (sendq[target].size() == 0) {
+    // target queue is empty
+    sendq.erase(target);
+
+    // remove target from sendq_targets
+    for (auto pos = sendq_targets.begin(); pos != sendq_targets.end(); ++pos) {
+      // for (int x = 0; x < (int)sendq_targets.size(); ++x) {
+      if (*pos == target) {
+        sendq_targets.erase(pos);
+        break;
+      }
+    }
+
+    // verify the sendq_current is still valid
+    if (sendq_current >= (int)sendq_targets.size())
+      sendq_current = 0;
+  }
+
+  if (!sendq_targets.empty()) {
+    // more to do, let's do it again!
+    sendq_timer.expires_after(std::chrono::milliseconds(sendq_ms));
+    sendq_timer.async_wait(std::bind(&ircClient::on_sendq, this, _1));
+  } else {
+    // let write_queue know we aren't running anymore.
+    sendq_active = false;
+  }
+}
+#endif
 
 /**
  * @brief thread safe messages.push_back

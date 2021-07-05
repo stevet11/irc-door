@@ -166,6 +166,23 @@ void parse_input(door::Door &door, ircClient &irc) {
       door << "[ESC] aborts input" << door::nl;
     }
 
+    if (cmd[0] == "/flood") {
+      std::string target = irc.talkto();
+      std::string bugz = "bugz";
+      for (int x = 0; x < 20; ++x) {
+        std::string message = "PRIVMSG " + target +
+                              " : CHANNEL FLOOD TESTING THIS IS MESSAGE " +
+                              std::to_string(x + 1) + " TEST TEST TEST";
+        irc.write_queue(target, message);
+        message = "PRIVMSG " + bugz + " : USER FLOOD TESTING THIS IS MESSAGE " +
+                  std::to_string(x + 1) + " TEST TEST TEST";
+        irc.write_queue(bugz, message);
+        message = "PRIVMSG apollo : USER FLOOD TESTING THIS IS MESSAGE " +
+                  std::to_string(x + 1) + " TEST TEST TEST";
+        irc.write_queue("apollo", message);
+      }
+    }
+
     if (cmd[0] == "/info") {
       irc.channels_lock.lock();
       for (auto c : irc.channels) {

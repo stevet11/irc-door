@@ -18,6 +18,8 @@
 
 #include <boost/asio/io_context.hpp>
 
+#define SENDQ
+
 void string_toupper(std::string &str);
 
 std::vector<std::string> split_limit(std::string &text, int max = -1);
@@ -45,6 +47,11 @@ public:
 
   // thread-safe write to IRC
   void write(std::string output);
+#ifdef SENDQ
+  // queued writer
+  void write_queue(std::string target, std::string output);
+  void on_sendq(error_code error);
+#endif
 
   // configuration
   std::string hostname;
@@ -129,6 +136,15 @@ private:
   boost::asio::ssl::context ssl_context;
   boost::asio::streambuf response;
   boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket;
+
+#ifdef SENDQ
+  boost::asio::high_resolution_timer sendq_timer;
+  std::map<std::string, std::vector<std::string>> sendq;
+  std::vector<std::string> sendq_targets;
+  int sendq_current;
+  std::atomic<bool> sendq_active;
+  int sendq_ms;
+#endif
 
   boost::asio::io_context &context;
 };
