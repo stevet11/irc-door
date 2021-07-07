@@ -93,6 +93,15 @@ int main(int argc, char *argv[]) {
   irc.realname = config["realname"].as<std::string>();
   irc.hostname = config["hostname"].as<std::string>();
   irc.port = config["port"].as<std::string>();
+
+  if (config["server_password"]) {
+    irc.server_password = config["server_password"].as<std::string>();
+  }
+
+  if (config["sasl_password"]) {
+    irc.sasl_plain_password = config["sasl_password"].as<std::string>();
+  }
+
   irc.username = config["username"].as<std::string>();
   irc.autojoin = config["autojoin"].as<std::string>();
   irc.version = "Bugz IRC Door 0.1 (C) 2021 Red-Green Software";

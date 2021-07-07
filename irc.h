@@ -20,6 +20,7 @@
 
 #define SENDQ
 
+std::string base64encode(const std::string &str);
 void string_toupper(std::string &str);
 
 std::vector<std::string> split_limit(std::string &text, int max = -1);
@@ -56,7 +57,9 @@ public:
   // configuration
   std::string hostname;
   std::string port;
+  std::string server_password;
   std::string nick;
+  std::string sasl_plain_password;
   std::string username = "bzbz";
   std::string realname;
   std::string autojoin;

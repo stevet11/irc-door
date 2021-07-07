@@ -164,6 +164,15 @@ void ircClient::write(std::string output) {
 }
 
 #ifdef SENDQ
+/**
+ * @brief Add to the sendq for async slow message sending.
+ *
+ * target is used (we cycle through sendq_targets) so no one person can clog up
+ * the queue.
+ *
+ * @param target
+ * @param output
+ */
 void ircClient::write_queue(std::string target, std::string output) {
   // is target in sendq_targets
   bool found = false;
@@ -181,6 +190,7 @@ void ircClient::write_queue(std::string target, std::string output) {
   sendq[target].push_back(output);
 
   if (!sendq_active) {
+    // async send is not active -- start the timer event
     sendq_active = true;
     sendq_current = 0;
     sendq_timer.expires_after(std::chrono::milliseconds(sendq_ms));
@@ -188,6 +198,20 @@ void ircClient::write_queue(std::string target, std::string output) {
   }
 }
 
+/**
+ * @brief async send buffer
+ *
+ * This sends lines out slowly to the ircd.  It uses the sendq_targets to
+ * alternate between so one person can't clog up the buffer.
+ *
+ * TODO:  Add something that checks to see how many lines we have sent.
+ * After 20 lines, increase the sendq_ms (maybe 2*sendq_ms?)  After 50, maybe
+ * 3*sendq_ms.  We want to throttle ourselves and not have the ircd doing it.
+ *
+ * Currently, this is not thread-safe.  It's being used by code that isn't
+ * running the io_context in another thread.
+ * @param error
+ */
 void ircClient::on_sendq(error_code error) {
   std::string &target = sendq_targets[sendq_current];
 
@@ -303,6 +327,8 @@ void ircClient::on_handshake(error_code error) {
     socket.async_shutdown(std::bind(&ircClient::on_shutdown, this, _1));
   }
 
+  write(registration());
+  /*
   std::string request = registration();
   boost::asio::async_write(socket, boost::asio::buffer(request),
                            std::bind(&ircClient::on_write, this, _1, _2));
@@ -313,7 +339,7 @@ void ircClient::on_write(error_code error, std::size_t bytes_transferred) {
   if ((error) and (logging)) {
     log() << "Write: " << error.message() << std::endl;
   }
-
+  */
   // << ", bytes transferred: " << bytes_transferred << "\n";
   boost::asio::async_read_until(
       socket, response, '\n', std::bind(&ircClient::read_until, this, _1, _2));
@@ -625,6 +651,30 @@ void ircClient::receive(std::string &text) {
       }
     }
 
+    if ((parts[1] == "CAP") and (parts[3] == "ACK")) {
+      write("AUTHENTICATE PLAIN");
+    }
+    if ((parts[0] == "AUTHENTICATE") and (parts[1] == "+")) {
+      std::string userpass;
+      userpass.append(1, 0);
+      userpass.append(nick);
+      userpass.append(1, 0);
+      userpass.append(sasl_plain_password);
+      std::string asbase64 = base64encode(userpass);
+      std::string auth = "AUTHENTICATE " + asbase64;
+      write(auth);
+    }
+
+    if (parts[1] == "903") {
+      // success SASL
+      write("CAP END");
+    }
+
+    if (parts[1] == "904") {
+      // SASL failed
+      write("CAP END");
+    }
+
     if ((parts[1] == "376") or (parts[1] == "422")) {
       // END MOTD, or MOTD MISSING
       find_max_nick_length(); // start with ourself.
@@ -673,7 +723,28 @@ void ircClient::find_max_nick_length(void) {
 
 std::string ircClient::registration(void) {
   std::string text;
-  text = "NICK " + nick + "\r\n" + "USER " + username + " 0 * :" + realname +
-         "\r\n";
+  if (!sasl_plain_password.empty()) {
+    text = "CAP REQ :sasl\r\n";
+  }
+  if (!server_password.empty()) {
+    text += "PASS " + server_password + "\r\n";
+  }
+  text += "NICK " + nick + "\r\n" + "USER " + username + " 0 * :" + realname +
+          "\r\n";
   return text;
+}
+
+#include <boost/archive/iterators/base64_from_binary.hpp>
+#include <boost/archive/iterators/transform_width.hpp>
+
+typedef boost::archive::iterators::base64_from_binary<
+    boost::archive::iterators::transform_width<std::string::const_iterator, 6,
+                                               8>>
+    it_base64_t;
+
+std::string base64encode(const std::string &str) {
+  unsigned int writePaddChars = (3 - str.length() % 3) % 3;
+  std::string base64(it_base64_t(str.begin()), it_base64_t(str.end()));
+  base64.append(writePaddChars, '=');
+  return base64;
 }

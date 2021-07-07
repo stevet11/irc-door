@@ -153,7 +153,7 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
   if (cmd == "NOTICE") {
     // NOTICE doesn't display the target (nick or channel)
     std::string tmp = irc_msg[3];
-    tmp.erase(0, 1);
+    // tmp.erase(0, 1);
     stamp(msg_stamp.stamp, door);
     int left = stamp_length;
     std::string nick = parse_nick(irc_msg[0]);
@@ -281,6 +281,7 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
 
     if (target[0] == '#') {
       // pay attention to channel modes.  Forget user modes for now.
+      /*
       std::string mode = modes.substr(0, 2);
 
       if (mode == "+s") {
@@ -315,8 +316,18 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
         door << info << "* " << nick << " removes channel " << target
              << " moderated" << door::reset << door::nl;
       }
+      */
+      // Tue Jul  6 23:08:09 2021 >> [:bugz!bugz@netadmin.red-green.com] [MODE]
+      // [#bugz] [+i] []
 
       // modes on a user in the channel
+      stamp(msg_stamp.stamp, door);
+      door << info << "* " << nick << " sets MODE " << modes;
+      if (irc_msg.size() > 4)
+        door << " " << irc_msg[4];
+      door << " on " << target << door::reset << door::nl;
+
+      /*
       if (mode == "+o") {
         modes.erase(0, 3);
         stamp(msg_stamp.stamp, door);
@@ -341,6 +352,7 @@ void render(message_stamp &msg_stamp, door::Door &door, ircClient &irc) {
         door << info << "* " << nick << " removes " << modes << " voice on "
              << target << door::reset << door::nl;
       }
+      */
     }
   }
 }
