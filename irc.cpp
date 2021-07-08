@@ -568,6 +568,9 @@ void ircClient::receive(std::string &text) {
       // Possibly a CTCP request.  Let's see
       std::string message = msg;
       if ((message[0] == '\x01') and (message[message.size() - 1] == '\x01')) {
+        // CTCP handler
+        // NOTE:  When sent to a channel, the response is sent to the sender.
+
         // CTCP MESSAGE FOUND  strip \x01's
         message.erase(0, 1);
         message.erase(message.size() - 1);
@@ -628,9 +631,6 @@ void ircClient::receive(std::string &text) {
     }
   }
 
-  // CTCP handler
-  // NOTE:  When sent to a channel, the response is sent to the sender.
-
   if (!registered) {
     // We're not registered yet
     if (parts[1] == "433") {
@@ -651,9 +651,11 @@ void ircClient::receive(std::string &text) {
       }
     }
 
+    // SASL Authentication
     if ((parts[1] == "CAP") and (parts[3] == "ACK")) {
       write("AUTHENTICATE PLAIN");
     }
+
     if ((parts[0] == "AUTHENTICATE") and (parts[1] == "+")) {
       std::string userpass;
       userpass.append(1, 0);
@@ -673,6 +675,7 @@ void ircClient::receive(std::string &text) {
     if (parts[1] == "904") {
       // SASL failed
       write("CAP END");
+      // Should we close the connection if we can't authenticate?
     }
 
     if ((parts[1] == "376") or (parts[1] == "422")) {
@@ -686,16 +689,7 @@ void ircClient::receive(std::string &text) {
     }
   }
 
-  if (parts[0] == "ERROR") {
-    // we're outta here.  :O
-    // std::cout << "BANG!" << std::endl;
-  }
-
   message_append(ms);
-
-  // :FROM command TO :rest and ':' is optional
-
-  // std::cout << text << "\n";
 }
 
 /**
@@ -723,12 +717,16 @@ void ircClient::find_max_nick_length(void) {
 
 std::string ircClient::registration(void) {
   std::string text;
+
+  // Initiate SASL authentication
   if (!sasl_plain_password.empty()) {
     text = "CAP REQ :sasl\r\n";
   }
+
   if (!server_password.empty()) {
     text += "PASS " + server_password + "\r\n";
   }
+
   text += "NICK " + nick + "\r\n" + "USER " + username + " 0 * :" + realname +
           "\r\n";
   return text;

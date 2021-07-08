@@ -249,7 +249,12 @@ bool check_for_input(door::Door &door, ircClient &irc) {
         // handle timeout/hangup/out of time
         if (c < -1) {
           if (!has_quit) {
-            irc.write("QUIT");
+            std::string quit = "QUIT :";
+            if (c == -2)
+              quit += "BBS User Dropped Connection";
+            if (c == -3)
+              quit += "BBS User Out of time";
+            irc.write(quit);
             has_quit = true;
           }
         }
